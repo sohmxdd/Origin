@@ -1,7 +1,7 @@
 """Origin TUI — Interactive terminal workspace.
 
 A keyboard-first, responsive terminal dashboard featuring a persistent HeaderBar
-with diagonal pixel-art black hole, a ContentSwitcher main area, and an always-focused
+with custom 8-bit atom logo, a ContentSwitcher main area, and an always-focused
 bottom CommandInput bar. Every action delegates to use_cases.py.
 """
 
@@ -284,7 +284,7 @@ class HeaderBar(Static):
         # Vertical layout on left
         left_layout = f"{info_text}\n\n{view_text}"
 
-        # If narrow, hide the black hole
+        # If narrow, hide the atom logo
         if self.app and self.app.is_narrow:
             self.update(left_layout)
             return

@@ -64,7 +64,7 @@ def get_static_test_workspace(name: str) -> str:
 
 
 def test_boot_screen_snapshot(snap_compare):
-    """Capture the concentric ring pixel-art black hole splash screen."""
+    """Capture the atom logo splash screen."""
     workspace_root = get_static_test_workspace("boot")
     init_workspace(workspace_root, "SplashTest", with_hooks=False)
 
