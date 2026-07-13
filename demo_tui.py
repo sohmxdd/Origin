@@ -42,7 +42,7 @@ def main() -> None:
     # Clean up previous runs
     if os.path.exists(workspace_dir):
         shutil.rmtree(workspace_dir, onexc=remove_readonly)
-    os.makedirs(workspace_dir)
+    os.makedirs(workspace_dir, exist_ok=True)
 
     # Init git repo
     subprocess.run(["git", "init"], cwd=workspace_dir, capture_output=True, check=True)
