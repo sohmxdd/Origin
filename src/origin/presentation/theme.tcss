@@ -1,5 +1,6 @@
-/* Origin TUI — 8-bit Black Hole Theme v2 */
-/* Pure black background, glowing cyan/teal accents, zero default-color leakage */
+/* Origin TUI — Event Horizon Theme v3 */
+/* Modern CLI aesthetic: bright cyan = active/focused only. */
+/* Everything else recedes into dim accent or muted gray. */
 
 Screen {
     background: #000000;
@@ -9,11 +10,10 @@ Screen {
 #header-bar {
     dock: top;
     height: 3;
-    background: #050505;
-    color: #00ffd2;
-    text-style: bold;
+    background: #000000;
+    color: #4d4d4d;
     padding: 0 2;
-    border-bottom: solid #0a4a42;
+    border-bottom: solid #111111;
 }
 
 /* ── Content Switcher ──────────────────────────────────── */
@@ -23,53 +23,51 @@ Screen {
 }
 
 /* ── Overview View ────────────────────────────────────── */
-.overview-card {
-    background: #050505;
-    border: heavy #0a4a42;
-    padding: 1 2;
-    margin-bottom: 1;
-}
-
-#overview-metrics {
-    height: 5;
-    margin-bottom: 1;
-}
-
-.metric-card {
-    background: #050505;
-    border: heavy #0a4a42;
-    margin-right: 2;
+.overview-section {
+    background: #000000;
     padding: 0 2;
-    width: 32%;
+    margin-bottom: 1;
+}
+
+.section-header {
+    color: #0a4a42;
+    text-style: bold;
+}
+
+.section-rule {
+    color: #111111;
+}
+
+#overview-stat-line {
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
 .diagnostics-panel {
-    height: 9;
-    background: #050505;
-    border: heavy #0a4a42;
-    padding: 0 1;
-    margin-top: 1;
+    height: auto;
+    max-height: 10;
+    background: #000000;
+    padding: 0 0;
 }
 
 #overview-timeline-feed {
-    padding: 1 2;
+    padding: 0 0;
 }
 
 /* ── Context View ──────────────────────────────────────── */
 #context-markdown {
-    background: #050505;
-    border: heavy #0a4a42;
+    background: #000000;
     padding: 1 2;
 }
 
 /* ── List Views & Inspector Layout ─────────────────────── */
 .list-pane {
-    background: #050505;
+    background: #000000;
     padding: 0 1;
 }
 
 .inspector-pane {
-    background: #050505;
+    background: #000000;
     padding: 1 2;
 }
 
@@ -80,7 +78,7 @@ Screen {
 
 .wide .inspector-pane {
     width: 40%;
-    border-left: solid #0a4a42;
+    border-left: solid #111111;
 }
 
 .narrow .inspector-pane {
@@ -96,46 +94,29 @@ Screen {
     display: none;
 }
 
-/* ── UI Panels ─────────────────────────────────────────── */
-.panel {
-    background: #050505;
-    border: heavy #0a4a42;
-    padding: 0 1;
-    margin-bottom: 1;
-}
-
+/* ── Panel Title (used in list views) ─────────────────── */
 .panel-title {
-    color: #00ffd2;
+    color: #0a4a42;
     text-style: bold;
     margin-bottom: 1;
-}
-
-/* Pulsing focus border classes */
-.pulse-a:focus-within {
-    border: heavy #00ffd2;
-}
-
-.pulse-b:focus-within {
-    border: heavy #0a4a42;
-}
-
-.list-pane:focus-within {
-    border: heavy #00ffd2;
 }
 
 /* ── ListView & Scrollbars ────────────────────────────── */
 ListView {
-    background: #050505;
+    background: #000000;
     scrollbar-background: #000000;
-    scrollbar-color: #0a4a42;
-    scrollbar-color-active: #00ffd2;
-    scrollbar-color-hover: #00ffd2;
+    scrollbar-color: #111111;
+    scrollbar-color-active: #0a4a42;
+    scrollbar-color-hover: #0a4a42;
+}
+
+ListView > ListItem {
+    background: #000000;
 }
 
 ListView > ListItem.--highlight {
-    background: #0a4a42;
+    background: #0a1a16;
     color: #00ffd2;
-    text-style: bold;
 }
 
 ListView:focus > ListItem.--highlight {
@@ -146,25 +127,29 @@ ListView:focus > ListItem.--highlight {
 
 /* Day header inside timeline list */
 .day-header {
-    background: #050505;
+    background: #000000;
     color: #0a4a42;
     text-style: bold;
     margin-top: 1;
-    margin-bottom: 1;
 }
 
-/* ── Command Palette Overlay ──────────────────────────────── */
+/* ── Command Palette Overlay ──────────────────────────── */
+/* Dim border at rest, bright on focus-within */
 #command-palette {
     align: center middle;
     width: 70;
     height: 25;
     background: #050505;
-    border: heavy #00ffd2;
+    border: heavy #0a4a42;
     padding: 1 2;
 }
 
+#command-palette:focus-within {
+    border: heavy #00ffd2;
+}
+
 #command-palette-title {
-    color: #00ffd2;
+    color: #0a4a42;
     text-style: bold;
     margin-bottom: 1;
     content-align: center middle;
@@ -173,21 +158,26 @@ ListView:focus > ListItem.--highlight {
 #command-palette-list {
     height: 1fr;
     background: #050505;
-    border-top: solid #0a4a42;
+    border-top: solid #111111;
 }
 
-/* ── Search Overlay ───────────────────────────────────────── */
+/* ── Search Overlay ──────────────────────────────────── */
+/* Dim border at rest, bright on focus-within */
 #search-overlay-container {
     align: center middle;
     width: 80;
     height: 25;
-    background: #000000;
-    border: heavy #00ffd2;
+    background: #050505;
+    border: heavy #0a4a42;
     padding: 1 2;
 }
 
+#search-overlay-container:focus-within {
+    border: heavy #00ffd2;
+}
+
 #search-overlay-title {
-    color: #00ffd2;
+    color: #0a4a42;
     text-style: bold;
     margin-bottom: 1;
     content-align: center middle;
@@ -195,14 +185,14 @@ ListView:focus > ListItem.--highlight {
 
 #search-overlay-list {
     height: 1fr;
-    background: #000000;
-    border-top: solid #0a4a42;
+    background: #050505;
+    border-top: solid #111111;
 }
 
 /* ── Textual Input overrides ────────────────────────────── */
 Input {
     background: #050505;
-    border: tall #0a4a42;
+    border: tall #111111;
     color: #00ffd2;
     margin-bottom: 1;
 }
@@ -222,18 +212,18 @@ Input:focus {
 
 /* ── Footer ────────────────────────────────────────────── */
 Footer {
-    background: #050505;
+    background: #000000;
     color: #4d4d4d;
 }
 
 Footer > .footer--highlight {
-    background: #00ffd2;
-    color: #000000;
+    background: #0a4a42;
+    color: #00ffd2;
 }
 
 Footer > .footer--key {
-    background: #0a4a42;
-    color: #00ffd2;
+    background: #111111;
+    color: #0a4a42;
 }
 
 Footer > .footer--description {
@@ -241,11 +231,6 @@ Footer > .footer--description {
 }
 
 /* ── Splash Screen ─────────────────────────────────────── */
-#splash-screen {
-    background: #000000;
-    align: center middle;
-}
-
 #splash-art {
     width: 100%;
     height: 100%;

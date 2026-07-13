@@ -60,32 +60,39 @@ TIMELINE_GLYPHS = {
     "commit": "■",
 }
 
-SINGULARITY_FRAMES = ["◐", "◓", "◑", "◒"]
+# Brand glyph for the header bar (persists after splash dismisses)
+BRAND_GLYPH = "[bold #00ffd2]●[/]"
 
 # ── Splash Screen Art ──────────────────────────────────────
 SPLASH_ART = """
-                     [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-                 [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-              [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▓▒▒░░  ░░▒▒▓▓█████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-            [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░          ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-          [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░              ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-        [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▒░     ░░▒▒▓▓██▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
-       [#0a4a42]░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▒░     ░▒▓████████▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
-      [#0a4a42]░▒[/#0a4a42][#00ffd2]▓▓██████▒░      ░▒▓███    ███▓▒░     ▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒[/#0a4a42]
-      [#0a4a42]▒[/#0a4a42][#00ffd2]▓███████▓░       ▒▓██        ██▓▒      ▓████████▓[/#00ffd2][#0a4a42]▒[/#0a4a42]
-  [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████████        ████████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-  [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████████        ████████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-      [#0a4a42]▒[/#0a4a42][#00ffd2]▓███████▓░       ▒▓██        ██▓▒      ▓████████▓[/#00ffd2][#0a4a42]▒[/#0a4a42]
-      [#0a4a42]░▒[/#0a4a42][#00ffd2]▓▓██████▒░      ░▒▓███    ███▓▒░     ▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒[/#0a4a42]
-       [#0a4a42]░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▒░     ░▒▓████████▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
-        [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▒░     ░░▒▒▓▓██▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
-          [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░              ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-            [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░          ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-              [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▓▒▒░░  ░░▒▒▓▓█████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-                 [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
-                     [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
 
-                               [bold #00ffd2]O R I G I N[/]
+
+                        [#4d4d4d]·  ˚    ✦     ·[/#4d4d4d]
+                   [#4d4d4d]✦[/#4d4d4d]        [#4d4d4d]˚[/#4d4d4d]
+                                [#4d4d4d]·[/#4d4d4d]
+                     [#4d4d4d]░░[/#4d4d4d][#e2a855]▒▒▓▓████▓▓▒▒[/#e2a855][#4d4d4d]░░[/#4d4d4d]
+                 [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓███████████████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
+              [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓████▓▓▒░░[/#e2a855]      [#e2a855]░░▒▓▓████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
+            [#e2a855]▒▓████▓▒░[/#e2a855]              [#e2a855]░▒▓████▓▒[/#e2a855]
+           [#e2a855]▓████▓▒░[/#e2a855]                  [#e2a855]░▒▓████▓[/#e2a855]
+          [#e2a855]▓███▓▒░[/#e2a855]      [#0a4a42]░▒▓██▓▒░[/#0a4a42]      [#e2a855]░▒▓███▓[/#e2a855]
+         [#e2a855]▓███▓░[/#e2a855]      [#0a4a42]▒▓██████▓▒[/#0a4a42]      [#e2a855]░▓███▓[/#e2a855]
+         [#e2a855]████▒[/#e2a855]      [#0a4a42]▓███[/#0a4a42]  [bold #00ffd2]●●[/]  [#0a4a42]███▓[/#0a4a42]      [#e2a855]▒████[/#e2a855]
+     [#e2a855]▓▓██████████████████[/#e2a855]  [bold #00ffd2]●●[/]  [#e2a855]██████████████████▓▓[/#e2a855]
+     [#e2a855]▓▓██████████████████[/#e2a855]  [bold #00ffd2]●●[/]  [#e2a855]██████████████████▓▓[/#e2a855]
+         [#e2a855]████▒[/#e2a855]      [#0a4a42]▓███[/#0a4a42]  [bold #00ffd2]●●[/]  [#0a4a42]███▓[/#0a4a42]      [#e2a855]▒████[/#e2a855]
+         [#e2a855]▓███▓░[/#e2a855]      [#0a4a42]▒▓██████▓▒[/#0a4a42]      [#e2a855]░▓███▓[/#e2a855]
+          [#e2a855]▓███▓▒░[/#e2a855]      [#0a4a42]░▒▓██▓▒░[/#0a4a42]      [#e2a855]░▒▓███▓[/#e2a855]
+           [#e2a855]▓████▓▒░[/#e2a855]                  [#e2a855]░▒▓████▓[/#e2a855]
+            [#e2a855]▒▓████▓▒░[/#e2a855]              [#e2a855]░▒▓████▓▒[/#e2a855]
+              [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓████▓▓▒░░[/#e2a855]      [#e2a855]░░▒▓▓████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
+                 [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓███████████████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
+                     [#4d4d4d]░░[/#4d4d4d][#e2a855]▒▒▓▓████▓▓▒▒[/#e2a855][#4d4d4d]░░[/#4d4d4d]
+                          [#4d4d4d]˚[/#4d4d4d]
+                  [#4d4d4d]·[/#4d4d4d]     [#4d4d4d]✦[/#4d4d4d]       [#4d4d4d]˚  ·[/#4d4d4d]
+
+                         [bold #00ffd2]O R I G I N[/]
+                     [#4d4d4d]event horizon memory[/#4d4d4d]
 """
 
 
@@ -221,7 +228,7 @@ class InspectorPanel(VerticalScroll):
             superseded = f"\n[bold #0a4a42]Superseded by:[/] [#00ffd2]{dec.superseded_by}[/]"
 
         content = (
-            f"[bold #00ffd2]DECISION INSPECTOR[/]\n\n"
+            f"[#0a4a42]Decision details[/]\n"
             f"[bold {style}]{glyph} {dec.title}[/]\n\n"
             f"[bold #0a4a42]ID:[/] {dec.id}\n"
             f"[bold #0a4a42]Status:[/] {dec.status}\n"
@@ -230,15 +237,15 @@ class InspectorPanel(VerticalScroll):
             f"[bold #0a4a42]Created:[/] {dec.created_at.strftime('%Y-%m-%d %H:%M UTC')}\n"
             f"[bold #0a4a42]Updated:[/] {dec.updated_at.strftime('%Y-%m-%d %H:%M UTC')}"
             f"{superseded}\n\n"
-            f"[bold #00ffd2]Rationale[/]\n{dec.rationale}\n\n"
-            f"[bold #00ffd2]Alternatives Considered[/]\n{alts}\n\n"
-            f"[bold #00ffd2]Affected Files[/]\n{files}"
+            f"[#0a4a42]Rationale[/]\n{dec.rationale}\n\n"
+            f"[#0a4a42]Alternatives considered[/]\n{alts}\n\n"
+            f"[#0a4a42]Affected files[/]\n{files}"
         )
         self.query_one("#inspector-content", Static).update(content)
 
     def update_memory(self, mem: MemoryEntry) -> None:
         content = (
-            f"[bold #00ffd2]MEMORY INSPECTOR[/]\n\n"
+            f"[#0a4a42]Memory details[/]\n"
             f"[bold #00ffd2]{mem.category}.{mem.key}[/]\n\n"
             f"[bold #0a4a42]Value:[/] {mem.value}\n"
             f"[bold #0a4a42]ID:[/] {mem.id}\n"
@@ -250,7 +257,7 @@ class InspectorPanel(VerticalScroll):
 
     def update_timeline_event(self, event: TimelineEvent, related_dec: Optional[Decision] = None) -> None:
         content = (
-            f"[bold #00ffd2]TIMELINE EVENT INSPECTOR[/]\n\n"
+            f"[#0a4a42]Event details[/]\n"
             f"[bold #00ffd2]{event.summary}[/]\n\n"
             f"[bold #0a4a42]Event Type:[/] {event.event_type}\n"
             f"[bold #0a4a42]ID:[/] {event.id}\n"
@@ -271,21 +278,20 @@ class OverviewView(VerticalScroll):
     """The Overview Landing Dashboard View."""
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="overview-card"):
-            yield Static("[bold #00ffd2]WORKSPACE SUMMARY[/]\n", markup=True)
+        with Vertical(classes="overview-section"):
+            yield Static("[#0a4a42]Workspace summary[/]", classes="section-header", markup=True)
+            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
             yield Static(id="overview-info", markup=True)
+            yield Static(id="overview-stat-line", markup=True)
             
-        with Horizontal(id="overview-metrics"):
-            yield Static(id="metric-proposed", classes="metric-card", markup=True)
-            yield Static(id="metric-active", classes="metric-card", markup=True)
-            yield Static(id="metric-memory", classes="metric-card", markup=True)
-            
-        with Vertical(classes="panel"):
-            yield Static("[bold #00ffd2]INLINE SYSTEM DIAGNOSTICS[/]", markup=True)
+        with Vertical(classes="overview-section"):
+            yield Static("[#0a4a42]System diagnostics[/]", classes="section-header", markup=True)
+            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
             yield VerticalScroll(id="overview-diagnostics", classes="diagnostics-panel")
             
-        with Vertical(classes="panel"):
-            yield Static("[bold #00ffd2]RECENT ACTIVITY[/]", markup=True)
+        with Vertical(classes="overview-section"):
+            yield Static("[#0a4a42]Recent activity[/]", classes="section-header", markup=True)
+            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
             yield Vertical(id="overview-timeline-feed")
 
     def update_data(self, workspace_name: str, branch: str, active_agents: int,
@@ -298,16 +304,21 @@ class OverviewView(VerticalScroll):
 
         # Update summary text
         info = (
-            f"[bold #0a4a42]Workspace display name:[/] [#00ffd2]{workspace_name}[/]\n"
-            f"[bold #0a4a42]Active branch:[/] [#00ffd2]{branch}[/]\n"
-            f"[bold #0a4a42]Recently active agents:[/] [#00ffd2]{active_agents}[/]"
+            f"[#4d4d4d]Workspace:[/] [#00ffd2]{workspace_name}[/]  "
+            f"[#4d4d4d]Branch:[/] [#00ffd2]{branch}[/]  "
+            f"[#4d4d4d]Agents:[/] [#00ffd2]{active_agents}[/]"
         )
         self.query_one("#overview-info", Static).update(info)
 
-        # Update metric cards
-        self.query_one("#metric-proposed", Static).update(f"[#0a4a42]Proposed Decisions[/]\n[bold #00ffd2]  {proposed_cnt}[/]")
-        self.query_one("#metric-active", Static).update(f"[#00ffd2]Active Decisions[/]\n[bold #00ffd2]  {active_cnt}[/]")
-        self.query_one("#metric-memory", Static).update(f"[#4d4d4d]Memory Entries[/]\n[bold #00ffd2]  {memory_cnt}[/]")
+        # Update compact stat line
+        stat_line = (
+            f"[#0a4a42]Proposed[/] [bold #00ffd2]{proposed_cnt}[/]  "
+            f"[#4d4d4d]·[/]  "
+            f"[#0a4a42]Active[/] [bold #00ffd2]{active_cnt}[/]  "
+            f"[#4d4d4d]·[/]  "
+            f"[#0a4a42]Memory[/] [bold #00ffd2]{memory_cnt}[/]"
+        )
+        self.query_one("#overview-stat-line", Static).update(stat_line)
 
         # Update recent activity feed (last 5 events)
         feed = self.query_one("#overview-timeline-feed", Vertical)
@@ -346,7 +357,7 @@ class OverviewView(VerticalScroll):
                     results.append(f"[#e25555][FAIL][/] schema_version mismatch: expected '2.0', found '{config.schema_version}'.")
                     errors += 1
                 else:
-                    results.append(f"[#00ffd2][OK][/] config.yaml valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').")
+                    results.append(f"[#4d4d4d][OK] config.yaml valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').[/]")
             except Exception as e:
                 results.append(f"[#e25555][FAIL][/] config.yaml validation error: {e}")
                 errors += 1
@@ -360,7 +371,7 @@ class OverviewView(VerticalScroll):
             try:
                 repo = ArtifactRepository(db_path)
                 repo.list_decisions()
-                results.append("[#00ffd2][OK][/] workspace.db schema is valid.")
+                results.append("[#4d4d4d][OK] workspace.db schema is valid.[/]")
                 # Affected files staleness
                 decisions = repo.list_decisions(status="active")
                 for dec in decisions:
@@ -377,7 +388,7 @@ class OverviewView(VerticalScroll):
             results.append("[#e2a855][WARN][/] Not a git repository.")
             warnings += 1
         else:
-            results.append("[#00ffd2][OK][/] Git repository detected.")
+            results.append("[#4d4d4d][OK] Git repository detected.[/]")
 
         for res in results:
             diag.mount(Static(res, markup=True))
@@ -396,7 +407,8 @@ class ContextView(VerticalScroll):
     """The Prompt Context View."""
 
     def compose(self) -> ComposeResult:
-        yield Static("[bold #00ffd2]PROMPT CONTEXT BUNDLE[/]\n", markup=True)
+        yield Static("[#0a4a42]Prompt context[/]", classes="section-header", markup=True)
+        yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
         yield Markdown(id="context-markdown")
 
     def update_data(self, context_bundle: str) -> None:
@@ -408,7 +420,7 @@ class DecisionsView(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="decisions-list-pane", classes="list-pane"):
-            yield Static("[bold #00ffd2]DECISIONS[/]", classes="panel-title", markup=True)
+            yield Static("[#0a4a42]Decisions[/]", classes="panel-title", markup=True)
             yield ListView(id="decisions-list")
         yield InspectorPanel(id="decisions-inspector", classes="inspector-pane")
 
@@ -515,7 +527,7 @@ class KnowledgeView(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="knowledge-list-pane", classes="list-pane"):
-            yield Static("[bold #00ffd2]KNOWLEDGE BASE[/]", classes="panel-title", markup=True)
+            yield Static("[#0a4a42]Knowledge base[/]", classes="panel-title", markup=True)
             yield ListView(id="knowledge-list")
         yield InspectorPanel(id="knowledge-inspector", classes="inspector-pane")
 
@@ -615,7 +627,7 @@ class TimelineView(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="timeline-list-pane", classes="list-pane"):
-            yield Static("[bold #00ffd2]TIMELINE[/]", classes="panel-title", markup=True)
+            yield Static("[#0a4a42]Timeline[/]", classes="panel-title", markup=True)
             yield ListView(id="timeline-list")
         yield InspectorPanel(id="timeline-inspector", classes="inspector-pane")
 
@@ -672,7 +684,7 @@ class CommandPaletteModal(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="command-palette"):
-            yield Static("[bold #00ffd2]COMMAND PALETTE[/]", id="command-palette-title")
+            yield Static("[#0a4a42]Command palette[/]", id="command-palette-title")
             yield Input(placeholder="Type command... (Up/Down to navigate, Enter to run, ESC to close)", id="command-palette-input")
             yield ListView(id="command-palette-list")
 
@@ -735,7 +747,7 @@ class SearchOverlay(ModalScreen[Any]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="search-overlay-container"):
-            yield Static("[bold #00ffd2]SEARCH WORKSPACE[/]", id="search-overlay-title")
+            yield Static("[#0a4a42]Search workspace[/]", id="search-overlay-title")
             yield Input(placeholder="Type to search decisions & memory... (ESC to close)", id="search-overlay-input")
             yield ListView(id="search-overlay-list")
 
@@ -816,8 +828,6 @@ class OriginTUI(App):
         super().__init__()
         self.workspace_root = workspace_root or os.getcwd()
         self.show_splash = show_splash
-        self._singularity_frame = 0
-        self._pulse_phase = True
         
         self._decisions: list[Decision] = []
         self._all_decisions: list[Decision] = []
@@ -826,7 +836,6 @@ class OriginTUI(App):
         
         self._last_dir_state: dict[str, tuple[int, float]] = {}
         self._refresh_timer: Optional[Timer] = None
-        self._pulse_timer: Optional[Timer] = None
         self._status_clear_timer: Optional[Timer] = None
         
         self.views_cycle = ["overview", "context", "decisions", "knowledge", "timeline"]
@@ -863,8 +872,6 @@ class OriginTUI(App):
 
         # Polling for data refreshes
         self._refresh_timer = self.set_interval(2.0, self._poll_for_changes)
-        # Pulse toggle
-        self._pulse_timer = self.set_interval(1.0, self._toggle_pulse)
 
     def on_resize(self, event=None) -> None:
         if event and hasattr(event, "size"):
@@ -969,7 +976,6 @@ class OriginTUI(App):
 
         # Health glyph
         health_glyph, health_style = self._compute_health()
-        singularity = SINGULARITY_FRAMES[self._singularity_frame % len(SINGULARITY_FRAMES)]
 
         # Get recent agents count
         now = datetime.now(timezone.utc)
@@ -982,12 +988,15 @@ class OriginTUI(App):
                 recent_agents.add(e.originating_agent)
         agent_cnt = max(1, len(recent_agents))
 
+        # Current view name
+        view_label = self.views_cycle[self.current_view_idx]
+
         header.update(
-            f"  [{health_style}]{health_glyph}[/]  "
+            f"  {BRAND_GLYPH}  "
             f"[bold #00ffd2]{ws_name}[/]  "
-            f"[#0a4a42]⎇ {branch}[/]  "
-            f"[bold #00ffd2]{singularity}[/]  "
-            f"[dim #4d4d4d]Recently active: {agent_cnt}[/]"
+            f"[#4d4d4d]⎇ {branch}[/]  "
+            f"[{health_style}]{health_glyph}[/]  "
+            f"[#4d4d4d]{view_label}[/]"
         )
 
     def _compute_health(self) -> tuple[str, str]:
@@ -1019,7 +1028,6 @@ class OriginTUI(App):
             return "●", "#00ffd2"
 
     def _poll_for_changes(self) -> None:
-        self._singularity_frame = (self._singularity_frame + 1) % len(SINGULARITY_FRAMES)
         
         # Only re-load data and re-render lists if files changed
         if self._check_dir_changes():
@@ -1062,16 +1070,6 @@ class OriginTUI(App):
 
         return changed
 
-    def _toggle_pulse(self) -> None:
-        self._pulse_phase = not self._pulse_phase
-        panels = self.query(".panel")
-        for panel in panels:
-            panel.remove_class("pulse-a")
-            panel.remove_class("pulse-b")
-            if self._pulse_phase:
-                panel.add_class("pulse-a")
-            else:
-                panel.add_class("pulse-b")
 
     def _show_status(self, message: str, duration: float = 3.0) -> None:
         status = self.query_one("#status-message", Static)
