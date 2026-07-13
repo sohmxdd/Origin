@@ -1,9 +1,8 @@
 """Origin TUI — Interactive terminal workspace.
 
-A keyboard-first, responsive terminal dashboard featuring six views,
-a command palette, a search overlay, and a reactive sidebar inspector.
-Every action delegates to the same use_cases.py functions the CLI and MCP
-server already call.
+A keyboard-first, responsive terminal dashboard featuring a persistent HeaderBar
+with diagonal pixel-art black hole, a ContentSwitcher main area, and an always-focused
+bottom CommandInput bar. Every action delegates to use_cases.py.
 """
 
 import os
@@ -11,6 +10,7 @@ import re
 from datetime import datetime, timezone
 from collections import defaultdict
 from typing import List, Optional, Any, Dict, Set
+from rich.table import Table
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -18,7 +18,6 @@ from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
-    Footer,
     Input,
     ListItem,
     ListView,
@@ -46,9 +45,9 @@ STATUS_GLYPHS = {
 
 STATUS_STYLES = {
     "active": "bold #00ffd2",
-    "proposed": "#0a4a42",
+    "proposed": "#005555",
     "rejected": "bold #e25555",
-    "superseded": "#4d4d4d",
+    "superseded": "#444444",
 }
 
 TIMELINE_GLYPHS = {
@@ -60,45 +59,34 @@ TIMELINE_GLYPHS = {
     "commit": "■",
 }
 
-# Brand glyph for the header bar (persists after splash dismisses)
-BRAND_GLYPH = "[bold #00ffd2]●[/]"
-
-# ── Splash Screen Art ──────────────────────────────────────
-SPLASH_ART = """
-
-
-                        [#4d4d4d]·  ˚    ✦     ·[/#4d4d4d]
-                   [#4d4d4d]✦[/#4d4d4d]        [#4d4d4d]˚[/#4d4d4d]
-                                [#4d4d4d]·[/#4d4d4d]
-                     [#4d4d4d]░░[/#4d4d4d][#e2a855]▒▒▓▓████▓▓▒▒[/#e2a855][#4d4d4d]░░[/#4d4d4d]
-                 [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓███████████████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
-              [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓████▓▓▒░░[/#e2a855]      [#e2a855]░░▒▓▓████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
-            [#e2a855]▒▓████▓▒░[/#e2a855]              [#e2a855]░▒▓████▓▒[/#e2a855]
-           [#e2a855]▓████▓▒░[/#e2a855]                  [#e2a855]░▒▓████▓[/#e2a855]
-          [#e2a855]▓███▓▒░[/#e2a855]      [#0a4a42]░▒▓██▓▒░[/#0a4a42]      [#e2a855]░▒▓███▓[/#e2a855]
-         [#e2a855]▓███▓░[/#e2a855]      [#0a4a42]▒▓██████▓▒[/#0a4a42]      [#e2a855]░▓███▓[/#e2a855]
-         [#e2a855]████▒[/#e2a855]      [#0a4a42]▓███[/#0a4a42]  [bold #00ffd2]●●[/]  [#0a4a42]███▓[/#0a4a42]      [#e2a855]▒████[/#e2a855]
-     [#e2a855]▓▓██████████████████[/#e2a855]  [bold #00ffd2]●●[/]  [#e2a855]██████████████████▓▓[/#e2a855]
-     [#e2a855]▓▓██████████████████[/#e2a855]  [bold #00ffd2]●●[/]  [#e2a855]██████████████████▓▓[/#e2a855]
-         [#e2a855]████▒[/#e2a855]      [#0a4a42]▓███[/#0a4a42]  [bold #00ffd2]●●[/]  [#0a4a42]███▓[/#0a4a42]      [#e2a855]▒████[/#e2a855]
-         [#e2a855]▓███▓░[/#e2a855]      [#0a4a42]▒▓██████▓▒[/#0a4a42]      [#e2a855]░▓███▓[/#e2a855]
-          [#e2a855]▓███▓▒░[/#e2a855]      [#0a4a42]░▒▓██▓▒░[/#0a4a42]      [#e2a855]░▒▓███▓[/#e2a855]
-           [#e2a855]▓████▓▒░[/#e2a855]                  [#e2a855]░▒▓████▓[/#e2a855]
-            [#e2a855]▒▓████▓▒░[/#e2a855]              [#e2a855]░▒▓████▓▒[/#e2a855]
-              [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓████▓▓▒░░[/#e2a855]      [#e2a855]░░▒▓▓████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
-                 [#4d4d4d]░[/#4d4d4d][#e2a855]▒▓███████████████▓▒[/#e2a855][#4d4d4d]░[/#4d4d4d]
-                     [#4d4d4d]░░[/#4d4d4d][#e2a855]▒▒▓▓████▓▓▒▒[/#e2a855][#4d4d4d]░░[/#4d4d4d]
-                          [#4d4d4d]˚[/#4d4d4d]
-                  [#4d4d4d]·[/#4d4d4d]     [#4d4d4d]✦[/#4d4d4d]       [#4d4d4d]˚  ·[/#4d4d4d]
-
-                         [bold #00ffd2]O R I G I N[/]
-                     [#4d4d4d]event horizon memory[/#4d4d4d]
+# ── Pixel Art Atom Logos (based on reference PNG) ──────────
+# 8-bit Atom logo using our cyan HSL color scheme
+HEADER_ATOM_LOGO = """
+       [#00ffd2]▄██▄[/]    [#00ffd2]▄██▄[/]
+     [#00aaaa]▄█▀▀██▀▀██▄[/]
+    [#005555]██▀[/]  [#00ffd2]▄██▄[/]  [#005555]▀██[/]
+     [#00aaaa]▀█▄▄██▄▄██▀[/]
+       [#00ffd2]▀██▀[/]    [#00ffd2]▀██▀[/]
 """
+
+WELCOME_ATOM_LOGO = """
+         [#00ffd2]▄▄████▄▄[/]
+     [#00ffd2]▄████▀[/]  [#00aaaa]██[/]  [#00ffd2]▀▀██▄[/]
+   [#00ffd2]▄██▀▀[/] [#00aaaa]▄██▀▀██▀▀██▄[/] [#00ffd2]████▄[/]
+  [#00ffd2]██▀[/]   [#00aaaa]██▀[/]  [#00ffd2]▄████▄[/]  [#00aaaa]▀██[/]   [#00ffd2]▀██[/]
+  [#00ffd2]██[/]    [#00aaaa]██[/]   [#00ffd2]██████[/]   [#00aaaa]██[/]    [#00ffd2]██[/]
+  [#00ffd2]██▄[/]   [#00aaaa]██▄[/]  [#00ffd2]▀████▀[/]  [#00aaaa]▄██[/]   [#00ffd2]▄██[/]
+   [#00ffd2]▀████▄[/] [#00aaaa]▀██▄▄██▄▄██▀[/] [#00ffd2]▀▀██▄[/]
+     [#00ffd2]▀▀▀██▄[/]  [#00aaaa]██[/]  [#00ffd2]▄████▀[/]
+         [#00ffd2]▀▀████▀▀[/]
+"""
+
+SPLASH_ART = WELCOME_ATOM_LOGO + "\n\n       [bold #00ffd2]O R I G I N[/]\n"
 
 
 # ── Splash Screen ──────────────────────────────────────────
 class SplashScreen(Screen):
-    """Full-screen splash screen showing the 8-bit black hole."""
+    """Full-screen splash screen showing the cyan Atom logo."""
 
     def compose(self) -> ComposeResult:
         yield Static(SPLASH_ART, id="splash-art")
@@ -124,11 +112,11 @@ class GroupHeaderItem(ListItem):
         self.collapsed = collapsed
 
     def compose(self) -> ComposeResult:
-        sign = "[+]" if self.collapsed else "[-]"
+        sign = "▸" if self.collapsed else "▾"
         yield Static(f"[bold #00ffd2]{sign} {self.title}[/]", id="header-label", markup=True)
 
     def update_label(self) -> None:
-        sign = "[+]" if self.collapsed else "[-]"
+        sign = "▸" if self.collapsed else "▾"
         self.query_one("#header-label", Static).update(f"[bold #00ffd2]{sign} {self.title}[/]")
 
 
@@ -150,9 +138,9 @@ class DecisionItem(ListItem):
         if len(title) > 35:
             title = title[:32] + "..."
             
-        label_text = f"[{style}]{glyph}[/]  [{style}]{title}[/]  [#0a4a42]{dec.confidence:.2f}  {short_id}[/]"
+        label_text = f"  [{style}]{glyph}[/]  [{style}]{title}[/]  [dim #444444]{dec.confidence:.2f}  {short_id}[/]"
         if dec.superseded_by:
-            label_text += f"\n   [#4d4d4d]└─ superseded by {dec.superseded_by[:8]}[/]"
+            label_text += f"\n     [#444444]└─ superseded by {dec.superseded_by[:8]}[/]"
             
         yield Static(label_text, markup=True)
 
@@ -174,7 +162,7 @@ class MemoryItem(ListItem):
         if len(val_str) > 30:
             val_str = val_str[:27] + "..."
             
-        label_text = f"  [#4d4d4d]{key_str}[/] = [#00ffd2]{val_str}[/]"
+        label_text = f"    [#777777]{key_str}[/] = [#c0c0c0]{val_str}[/]"
         yield Static(label_text, markup=True)
 
 
@@ -197,17 +185,16 @@ class TimelineItem(ListItem):
         elif "accepted" in event.event_type or "accepted" in event.summary.lower():
             color = "#00ffd2"
         elif "superseded" in event.event_type or "superseded" in event.summary.lower():
-            color = "#4d4d4d"
+            color = "#444444"
         elif "memory" in event.event_type:
             color = "#00ffd2"
         elif "commit" in event.event_type:
-            color = "#0a4a42"
+            color = "#005555"
         else:
-            color = "#4d4d4d"
+            color = "#444444"
 
-        label = f"[#0a4a42]{time_str}[/]  [bold {color}]{glyph}[/]  [#4d4d4d]{event.summary}[/]"
+        label = f"  [#444444]{time_str}[/]  [bold {color}]{glyph}[/]  [#c0c0c0]{event.summary}[/]"
         yield Static(label, markup=True)
-
 
 
 # ── Shared Inspector Widget ────────────────────────────────
@@ -225,113 +212,167 @@ class InspectorPanel(VerticalScroll):
         
         superseded = ""
         if dec.superseded_by:
-            superseded = f"\n[bold #0a4a42]Superseded by:[/] [#00ffd2]{dec.superseded_by}[/]"
+            superseded = f"\n[bold #444444]Superseded by:[/] [#00ffd2]{dec.superseded_by}[/]"
 
         content = (
-            f"[#0a4a42]Decision details[/]\n"
+            f"[#777777]Decision details[/]\n"
             f"[bold {style}]{glyph} {dec.title}[/]\n\n"
-            f"[bold #0a4a42]ID:[/] {dec.id}\n"
-            f"[bold #0a4a42]Status:[/] {dec.status}\n"
-            f"[bold #0a4a42]Confidence:[/] {dec.confidence:.2f}\n"
-            f"[bold #0a4a42]Agent:[/] {dec.originating_agent}\n"
-            f"[bold #0a4a42]Created:[/] {dec.created_at.strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"[bold #0a4a42]Updated:[/] {dec.updated_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"[bold #444444]ID:[/] [#c0c0c0]{dec.id}[/]\n"
+            f"[bold #444444]Status:[/] [#c0c0c0]{dec.status}[/]\n"
+            f"[bold #444444]Confidence:[/] [#c0c0c0]{dec.confidence:.2f}[/]\n"
+            f"[bold #444444]Agent:[/] [#c0c0c0]{dec.originating_agent}[/]\n"
+            f"[bold #444444]Created:[/] [#c0c0c0]{dec.created_at.strftime('%Y-%m-%d %H:%M UTC')}[/]\n"
+            f"[bold #444444]Updated:[/] [#c0c0c0]{dec.updated_at.strftime('%Y-%m-%d %H:%M UTC')}[/]"
             f"{superseded}\n\n"
-            f"[#0a4a42]Rationale[/]\n{dec.rationale}\n\n"
-            f"[#0a4a42]Alternatives considered[/]\n{alts}\n\n"
-            f"[#0a4a42]Affected files[/]\n{files}"
+            f"[#777777]Rationale[/]\n[#c0c0c0]{dec.rationale}[/]\n\n"
+            f"[#777777]Alternatives considered[/]\n[#c0c0c0]{alts}[/]\n\n"
+            f"[#777777]Affected files[/]\n[#c0c0c0]{files}[/]"
         )
         self.query_one("#inspector-content", Static).update(content)
 
     def update_memory(self, mem: MemoryEntry) -> None:
         content = (
-            f"[#0a4a42]Memory details[/]\n"
+            f"[#777777]Memory details[/]\n"
             f"[bold #00ffd2]{mem.category}.{mem.key}[/]\n\n"
-            f"[bold #0a4a42]Value:[/] {mem.value}\n"
-            f"[bold #0a4a42]ID:[/] {mem.id}\n"
-            f"[bold #0a4a42]Agent:[/] {mem.originating_agent}\n"
-            f"[bold #0a4a42]Created:[/] {mem.created_at.strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"[bold #0a4a42]Updated:[/] {mem.updated_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"[bold #444444]Value:[/] [#c0c0c0]{mem.value}[/]\n"
+            f"[bold #444444]ID:[/] [#c0c0c0]{mem.id}[/]\n"
+            f"[bold #444444]Agent:[/] [#c0c0c0]{mem.originating_agent}[/]\n"
+            f"[bold #444444]Created:[/] [#c0c0c0]{mem.created_at.strftime('%Y-%m-%d %H:%M UTC')}[/]\n"
+            f"[bold #444444]Updated:[/] [#c0c0c0]{mem.updated_at.strftime('%Y-%m-%d %H:%M UTC')}[/]"
         )
         self.query_one("#inspector-content", Static).update(content)
 
     def update_timeline_event(self, event: TimelineEvent, related_dec: Optional[Decision] = None) -> None:
         content = (
-            f"[#0a4a42]Event details[/]\n"
+            f"[#777777]Event details[/]\n"
             f"[bold #00ffd2]{event.summary}[/]\n\n"
-            f"[bold #0a4a42]Event Type:[/] {event.event_type}\n"
-            f"[bold #0a4a42]ID:[/] {event.id}\n"
-            f"[bold #0a4a42]Agent:[/] {event.originating_agent}\n"
-            f"[bold #0a4a42]Commit SHA:[/] {event.commit_sha or 'None'}\n"
-            f"[bold #0a4a42]Time:[/] {event.created_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"[bold #444444]Event Type:[/] [#c0c0c0]{event.event_type}[/]\n"
+            f"[bold #444444]ID:[/] [#c0c0c0]{event.id}[/]\n"
+            f"[bold #444444]Agent:[/] [#c0c0c0]{event.originating_agent}[/]\n"
+            f"[bold #444444]Commit SHA:[/] [#c0c0c0]{event.commit_sha or 'None'}[/]\n"
+            f"[bold #444444]Time:[/] [#c0c0c0]{event.created_at.strftime('%Y-%m-%d %H:%M UTC')}[/]"
         )
         if related_dec:
-            content += f"\n\n[bold #0a4a42]Related Decision Title:[/] {related_dec.title}"
+            content += f"\n\n[bold #444444]Related Decision Title:[/] [#c0c0c0]{related_dec.title}[/]"
         self.query_one("#inspector-content", Static).update(content)
 
     def update_empty(self, message: str = "Select an item to inspect") -> None:
-        self.query_one("#inspector-content", Static).update(f"[#4d4d4d]{message}[/]")
+        self.query_one("#inspector-content", Static).update(f"[#444444]{message}[/]")
 
 
-# ── Core Views ─────────────────────────────────────────────
-class OverviewView(VerticalScroll):
-    """The Overview Landing Dashboard View."""
+class HeaderBar(Static):
+    """The persistent top HeaderBar showing logo and current view status."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._info_text = ""
+
+    @property
+    def content(self) -> str:
+        return self._info_text
+
+    def update_header(self, ws_name: str, branch: str, health_glyph: str, health_style: str, view_label: str) -> None:
+        info_text = (
+            f"[bold #00ffd2]● ORIGIN[/]  [#444444]v1.0[/]  "
+            f"[#777777]Workspace:[/] [#00ffd2]{ws_name}[/]  "
+            f"[#777777]Branch:[/] [#00ffd2]{branch}[/]  "
+            f"[#777777]Health:[/] [{health_style}]{health_glyph}[/]"
+        )
+        view_text = f"[bold #00ffd2]{view_label.upper()}[/]  [#444444]·[/]  [#777777]Unified memory for your agents.[/]"
+        self._info_text = info_text
+
+        # Vertical layout on left
+        left_layout = f"{info_text}\n\n{view_text}"
+
+        # If narrow, hide the black hole
+        if self.app and self.app.is_narrow:
+            self.update(left_layout)
+            return
+
+        # Table grid for side-by-side layout
+        table = Table.grid(expand=True)
+        table.add_column(justify="left", ratio=1)
+        table.add_column(justify="right", width=28)
+        
+        table.add_row(
+            left_layout,
+            HEADER_ATOM_LOGO.strip("\n")
+        )
+        self.update(table)
+
+
+# ── Welcome Screen (Claude Code Style) ──────────────────────
+WELCOME_TITLE_MARKUP = """[bold white]Welcome back to[/]
+[bold #00ffd2] ▄██▄  ████▄  ██  ▄████  ██  ███ █[/]
+[bold #00ffd2]██  ██ ██▄██  ██ ██  ▄▄  ██  █████[/]
+[bold #00ffd2] ▀██▀  ██ ▀▄  ██  ▀████  ██  ██ ██[/]"""
+
+
+class WelcomeCard(Container):
+    """Main card widget on Home screen."""
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="overview-section"):
-            yield Static("[#0a4a42]Workspace summary[/]", classes="section-header", markup=True)
-            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
-            yield Static(id="overview-info", markup=True)
-            yield Static(id="overview-stat-line", markup=True)
-            
-        with Vertical(classes="overview-section"):
-            yield Static("[#0a4a42]System diagnostics[/]", classes="section-header", markup=True)
-            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
-            yield VerticalScroll(id="overview-diagnostics", classes="diagnostics-panel")
-            
-        with Vertical(classes="overview-section"):
-            yield Static("[#0a4a42]Recent activity[/]", classes="section-header", markup=True)
-            yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
-            yield Vertical(id="overview-timeline-feed")
+        yield Static(WELCOME_TITLE_MARKUP, id="welcome-title", markup=True)
+        with Horizontal(id="welcome-content"):
+            with Vertical(id="welcome-brand"):
+                yield Static(WELCOME_ATOM_LOGO, id="welcome-art", markup=True)
+                yield Static("[bold #00ffd2]● ORIGIN[/]", id="welcome-logo", markup=True)
+                yield Static("Unified memory for your agent", id="welcome-tagline")
+            with Vertical(id="welcome-stats-pane"):
+                yield Static(id="welcome-metadata", markup=True)
+                yield Static(id="welcome-metrics", markup=True)
+                yield Static("[bold #888888]Recent activity[/]", id="welcome-activity-header", markup=True)
+                yield Vertical(id="welcome-timeline-feed")
 
-    def update_data(self, workspace_name: str, branch: str, active_agents: int,
-                    decisions: list[Decision], memories: list[MemoryEntry],
-                    timeline: list[TimelineEvent]) -> None:
-        
-        proposed_cnt = len([d for d in decisions if d.status == "proposed"])
-        active_cnt = len([d for d in decisions if d.status == "active"])
-        memory_cnt = len(memories)
-
-        # Update summary text
-        info = (
-            f"[#4d4d4d]Workspace:[/] [#00ffd2]{workspace_name}[/]  "
-            f"[#4d4d4d]Branch:[/] [#00ffd2]{branch}[/]  "
-            f"[#4d4d4d]Agents:[/] [#00ffd2]{active_agents}[/]"
+    def update_data(self, workspace_name: str, branch: str, health_glyph: str, health_style: str,
+                    proposed_cnt: int, active_cnt: int, memory_cnt: int, timeline: list[TimelineEvent]) -> None:
+        metadata = (
+            f"[#777777]Workspace:[/] [#00ffd2]{workspace_name}[/]\n"
+            f"[#777777]Branch:[/]    [#00ffd2]{branch}[/]\n"
+            f"[#777777]Health:[/]    [{health_style}]{health_glyph} ok[/]"
         )
-        self.query_one("#overview-info", Static).update(info)
+        self.query_one("#welcome-metadata", Static).update(metadata)
 
-        # Update compact stat line
-        stat_line = (
-            f"[#0a4a42]Proposed[/] [bold #00ffd2]{proposed_cnt}[/]  "
-            f"[#4d4d4d]·[/]  "
-            f"[#0a4a42]Active[/] [bold #00ffd2]{active_cnt}[/]  "
-            f"[#4d4d4d]·[/]  "
-            f"[#0a4a42]Memory[/] [bold #00ffd2]{memory_cnt}[/]"
+        metrics = (
+            f"[#777777]Proposed:[/] [bold #00ffd2]{proposed_cnt}[/]\n"
+            f"[#777777]Active:[/]   [bold #00ffd2]{active_cnt}[/]\n"
+            f"[#777777]Memory:[/]   [bold #00ffd2]{memory_cnt}[/]"
         )
-        self.query_one("#overview-stat-line", Static).update(stat_line)
+        self.query_one("#welcome-metrics", Static).update(metrics)
 
-        # Update recent activity feed (last 5 events)
-        feed = self.query_one("#overview-timeline-feed", Vertical)
+        feed = self.query_one("#welcome-timeline-feed", Vertical)
         feed.remove_children()
-        
         if not timeline:
-            feed.mount(Static("[#4d4d4d]No recent activity logged.[/]", markup=True))
+            feed.mount(Static("[#444444]No recent activity.[/]", markup=True))
         else:
-            for event in timeline[:5]:
+            for event in timeline[:3]:
                 time_str = event.created_at.strftime("%H:%M")
                 glyph = TIMELINE_GLYPHS.get(event.event_type, "●")
-                line = f"[#0a4a42]{time_str}[/]  [#00ffd2]{glyph}[/]  [#4d4d4d]{event.summary}[/]"
+                line = f"[#444444]{time_str}[/]  [bold #00ffd2]{glyph}[/]  [#c0c0c0]{event.summary[:30]}[/]"
                 feed.mount(Static(line, markup=True))
+
+
+COMMAND_HINTS = """
+  [bold #00ffd2]/decisions[/]     Show all decisions and manage proposals
+  [bold #00ffd2]/knowledge[/]     Browse and inspect memory entries
+  [bold #00ffd2]/timeline[/]      Chronological event history
+  [bold #00ffd2]/context[/]       View the AI context bundle
+  [bold #00ffd2]/doctor[/]        Run workspace health diagnostics
+  [bold #00ffd2]/export[/]        Write ORIGIN.md flat file
+  [bold #00ffd2]/quit[/]          Exit Origin TUI
+
+  Type anything to search across decisions, memory and timeline.
+"""
+
+
+class HomeView(VerticalScroll):
+    """The Home Landing Dashboard (Overview)."""
+
+    def compose(self) -> ComposeResult:
+        yield WelcomeCard(id="welcome-card")
+        yield Static(COMMAND_HINTS, id="command-hints", markup=True)
+        yield Static("[bold #888888]System diagnostics[/]", id="diagnostics-header", classes="section-header", markup=True)
+        yield VerticalScroll(id="overview-diagnostics", classes="diagnostics-panel")
 
     def run_doctor_checks(self) -> None:
         """Run system diagnostics inline and render results."""
@@ -403,24 +444,23 @@ class OverviewView(VerticalScroll):
         diag.mount(Static(summary, markup=True))
 
 
+# ── Prompt Context View ────────────────────────────────────
 class ContextView(VerticalScroll):
     """The Prompt Context View."""
 
     def compose(self) -> ComposeResult:
-        yield Static("[#0a4a42]Prompt context[/]", classes="section-header", markup=True)
-        yield Static("[#111111]" + "─" * 60 + "[/]", classes="section-rule", markup=True)
         yield Markdown(id="context-markdown")
 
     def update_data(self, context_bundle: str) -> None:
         self.query_one("#context-markdown", Markdown).update(context_bundle)
 
 
+# ── Decisions View ─────────────────────────────────────────
 class DecisionsView(Horizontal):
     """The Decisions Management View."""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="decisions-list-pane", classes="list-pane"):
-            yield Static("[#0a4a42]Decisions[/]", classes="panel-title", markup=True)
             yield ListView(id="decisions-list")
         yield InspectorPanel(id="decisions-inspector", classes="inspector-pane")
 
@@ -436,7 +476,7 @@ class DecisionsView(Horizontal):
         lst.clear()
         
         if not decisions:
-            item = ListItem(Static("[#0a4a42]No decisions recorded. Try calling origin decision add[/]", markup=True))
+            item = ListItem(Static("[#444444]No decisions recorded. Try: origin decision add[/]", markup=True))
             item.is_empty_state = True
             lst.append(item)
             return
@@ -464,6 +504,7 @@ class DecisionsView(Horizontal):
                 
         if lst.children and lst.index is None:
             lst.index = 0
+        self.update_inspector()
 
     def get_selected_decision(self) -> Optional[Decision]:
         lst = self.query_one("#decisions-list", ListView)
@@ -499,7 +540,7 @@ class DecisionsView(Horizontal):
             lst.focus()
             self.update_inspector()
 
-    def on_list_view_highlighted_changed(self, event: ListView.HighlightedChanged) -> None:
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         self.update_inspector()
 
     def update_inspector(self) -> None:
@@ -522,12 +563,12 @@ class DecisionsView(Horizontal):
                     child.display = not header.collapsed
 
 
+# ── Knowledge View ─────────────────────────────────────────
 class KnowledgeView(Horizontal):
     """The Knowledge Base (Memory) View."""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="knowledge-list-pane", classes="list-pane"):
-            yield Static("[#0a4a42]Knowledge base[/]", classes="panel-title", markup=True)
             yield ListView(id="knowledge-list")
         yield InspectorPanel(id="knowledge-inspector", classes="inspector-pane")
 
@@ -542,7 +583,7 @@ class KnowledgeView(Horizontal):
         lst.clear()
 
         if not memories:
-            item = ListItem(Static("[#0a4a42]No memory entries recorded. Try: origin memory set <cat> <key> <val>[/]", markup=True))
+            item = ListItem(Static("[#444444]No memory entries recorded. Try: origin memory set <cat> <key> <val>[/]", markup=True))
             item.is_empty_state = True
             lst.append(item)
             return
@@ -570,6 +611,7 @@ class KnowledgeView(Horizontal):
 
         if lst.children and lst.index is None:
             lst.index = 0
+        self.update_inspector()
 
     def select_memory(self, category: str, key: str) -> None:
         """Select a memory entry and expand its group header if collapsed."""
@@ -599,7 +641,7 @@ class KnowledgeView(Horizontal):
             lst.focus()
             self.update_inspector()
 
-    def on_list_view_highlighted_changed(self, event: ListView.HighlightedChanged) -> None:
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         self.update_inspector()
 
     def update_inspector(self) -> None:
@@ -622,21 +664,32 @@ class KnowledgeView(Horizontal):
                     child.display = not header.collapsed
 
 
+# ── Timeline View ──────────────────────────────────────────
 class TimelineView(Horizontal):
     """The Chronological Timeline View."""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="timeline-list-pane", classes="list-pane"):
-            yield Static("[#0a4a42]Timeline[/]", classes="panel-title", markup=True)
             yield ListView(id="timeline-list")
-        yield InspectorPanel(id="timeline-inspector", classes="inspector-pane")
+        with Vertical(id="timeline-info-panel", classes="inspector-pane"):
+            yield Static(
+                "[#777777]Timeline Overview[/]\n\n"
+                "[bold #00ffd2]Chronological Activity Log[/]\n\n"
+                "This pane lists all events in your workspace memory:\n\n"
+                "  ● [#00ffd2]Decisions proposed, accepted, or rejected[/]\n"
+                "  ◆ [#00ffd2]Memory entries updated[/]\n"
+                "  ■ [#00ffd2]Git commits synced with workspace[/]\n\n"
+                "Origin automatically captures these changes to maintain a continuous, auditable history of your agent's context.",
+                id="timeline-info-content",
+                markup=True
+            )
 
     def populate(self, events: list[TimelineEvent], decisions: list[Decision]) -> None:
         lst = self.query_one("#timeline-list", ListView)
         lst.clear()
 
         if not events:
-            item = ListItem(Static("[#0a4a42]No timeline events recorded yet.[/]", markup=True))
+            item = ListItem(Static("[#444444]No timeline events recorded yet.[/]", markup=True))
             item.is_header = True
             lst.append(item)
             return
@@ -651,7 +704,7 @@ class TimelineView(Horizontal):
         days = sorted(groups.keys(), key=lambda d: datetime.strptime(d, "%B %d, %Y"), reverse=True)
 
         for day in days:
-            header = Static(f"[bold #0a4a42] {day} [/]", classes="day-header")
+            header = Static(f"[bold #444444]──── {day} ────[/]", classes="day-header")
             item_header = ListItem(header)
             item_header.is_header = True
             lst.append(item_header)
@@ -664,145 +717,72 @@ class TimelineView(Horizontal):
         if lst.children and lst.index is None:
             lst.index = 0
 
-    def on_list_view_highlighted_changed(self, event: ListView.HighlightedChanged) -> None:
-        self.update_inspector()
 
-    def update_inspector(self) -> None:
-        lst = self.query_one("#timeline-list", ListView)
-        inspector = self.query_one("#timeline-inspector", InspectorPanel)
-        
-        if lst.highlighted_child and getattr(lst.highlighted_child, "is_header", False) is False:
-            item = lst.highlighted_child
-            inspector.update_timeline_event(item.event, item.related_decision)
-        else:
-            inspector.update_empty("Select an event to inspect")
-
-
-# ── Command Palette Overlay ────────────────────────────────
-class CommandPaletteModal(ModalScreen[str]):
-    """Sleek keyboard-driven command palette overlay."""
+# ── Live Search Results View ───────────────────────────────
+class SearchResultsView(Horizontal):
+    """View to display live search results."""
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="command-palette"):
-            yield Static("[#0a4a42]Command palette[/]", id="command-palette-title")
-            yield Input(placeholder="Type command... (Up/Down to navigate, Enter to run, ESC to close)", id="command-palette-input")
-            yield ListView(id="command-palette-list")
+        with Vertical(id="search-list-pane", classes="list-pane"):
+            yield ListView(id="search-list")
+        yield InspectorPanel(id="search-inspector", classes="inspector-pane")
 
-    def on_mount(self) -> None:
-        self.query_one("#command-palette-input", Input).focus()
-        self._populate_list("")
-
-    def _populate_list(self, filter_text: str) -> None:
-        lst = self.query_one("#command-palette-list", ListView)
+    def populate(self, results: list[Any]) -> None:
+        lst = self.query_one("#search-list", ListView)
         lst.clear()
-        
-        # Toggle options depending on decisions view selection
-        dec_view = self.app.query_one("#decisions", DecisionsView)
-        selected_dec = dec_view.get_selected_decision()
-        can_accept_reject = selected_dec is not None and selected_dec.status == "proposed"
 
-        actions = [
-            ("Jump to Overview", "jump_overview"),
-            ("Jump to Context", "jump_context"),
-            ("Jump to Decisions", "jump_decisions"),
-            ("Jump to Knowledge Base", "jump_knowledge"),
-            ("Jump to Timeline", "jump_timeline"),
-            ("Accept Selected Decision", "accept_decision"),
-            ("Reject Selected Decision", "reject_decision"),
-            ("Search Workspace (/)", "search_workspace"),
-            ("Generate Context Export (ORIGIN.md)", "generate_export"),
-            ("Run Doctor Checks", "run_doctor"),
-            ("Quit", "quit"),
-        ]
-
-        for label, action in actions:
-            if action in ["accept_decision", "reject_decision"] and not can_accept_reject:
-                item = ListItem(Static(f"[#4d4d4d]{label} (Requires selecting a proposed decision)[/]", markup=True))
-                item.action_id = "disabled"
-            else:
-                if not filter_text or filter_text.lower() in label.lower():
-                    item = ListItem(Static(f"[#00ffd2]{label}[/]", markup=True))
-                    item.action_id = action
-                    lst.append(item)
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        self._populate_list(event.value.strip())
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        action = getattr(event.item, "action_id", "disabled")
-        if action != "disabled":
-            self.dismiss(action)
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        lst = self.query_one("#command-palette-list", ListView)
-        if lst.highlighted_child:
-            action = getattr(lst.highlighted_child, "action_id", "disabled")
-            if action != "disabled":
-                self.dismiss(action)
-
-
-# ── Search Overlay ─────────────────────────────────────────
-class SearchOverlay(ModalScreen[Any]):
-    """Full-width workspace search overlay."""
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="search-overlay-container"):
-            yield Static("[#0a4a42]Search workspace[/]", id="search-overlay-title")
-            yield Input(placeholder="Type to search decisions & memory... (ESC to close)", id="search-overlay-input")
-            yield ListView(id="search-overlay-list")
-
-    def on_mount(self) -> None:
-        self.query_one("#search-overlay-input", Input).focus()
-        self._perform_search("")
-
-    def _perform_search(self, query: str) -> None:
-        lst = self.query_one("#search-overlay-list", ListView)
-        lst.clear()
-        
-        if not query:
-            item = ListItem(Static("[#4d4d4d]Type to start searching...[/]", markup=True))
+        if not results:
+            item = ListItem(Static("[#444444]No matching results found.[/]", markup=True))
             item.result_data = None
             lst.append(item)
             return
 
-        try:
-            results = use_cases.search_artifacts(self.app.workspace_root, query)
-            if not results:
-                item = ListItem(Static("[#e25555]No matching results found.[/]", markup=True))
-                item.result_data = None
-                lst.append(item)
-                return
-
-            for art in results:
-                if art.type == "decision":
-                    style = STATUS_STYLES.get(art.status, "")
-                    glyph = STATUS_GLYPHS.get(art.status, "")
-                    label = f"[bold #00ffd2]Decision:[/] [{style}]{glyph} {art.title}[/] [dim #4d4d4d]({art.id[:8]})[/]"
-                else:
-                    label = f"[bold #00ffd2]Memory:[/] [#00ffd2]{art.category}.{art.key}[/] = [dim #4d4d4d]{art.value}[/]"
-                
-                item = ListItem(Static(label, markup=True))
-                item.result_data = art
-                lst.append(item)
-        except Exception as e:
-            item = ListItem(Static(f"[#e25555]Error: {e}[/]", markup=True))
-            item.result_data = None
+        for art in results:
+            if art.type == "decision":
+                style = STATUS_STYLES.get(art.status, "")
+                glyph = STATUS_GLYPHS.get(art.status, "")
+                label = f"[bold #00ffd2]Decision:[/] [{style}]{glyph} {art.title}[/] [dim #444444]({art.id[:8]})[/]"
+            else:
+                label = f"[bold #00ffd2]Memory:[/] [#00ffd2]{art.category}.{art.key}[/] = [dim #444444]{art.value}[/]"
+            
+            item = ListItem(Static(label, markup=True))
+            item.result_data = art
             lst.append(item)
 
-        if lst.children and lst.index is None:
+        if lst.children:
             lst.index = 0
+        self.update_inspector()
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        self._perform_search(event.value.strip())
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        if getattr(event.item, "result_data", None):
-            self.dismiss(event.item.result_data)
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        lst = self.query_one("#search-overlay-list", ListView)
+    def get_selected_result(self) -> Optional[Any]:
+        lst = self.query_one("#search-list", ListView)
         if lst.highlighted_child and getattr(lst.highlighted_child, "result_data", None):
-            self.dismiss(lst.highlighted_child.result_data)
+            return lst.highlighted_child.result_data
+        return None
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        self.update_inspector()
+
+    def update_inspector(self) -> None:
+        lst = self.query_one("#search-list", ListView)
+        inspector = self.query_one("#search-inspector", InspectorPanel)
+        
+        if lst.highlighted_child and getattr(lst.highlighted_child, "result_data", None):
+            res = lst.highlighted_child.result_data
+            if res.type == "decision":
+                inspector.update_decision(res)
+            else:
+                inspector.update_memory(res)
+        else:
+            inspector.update_empty("Select a search result to inspect")
+
+
+# ── Command Input Container ────────────────────────────────
+class CommandInput(Container):
+    """The always-focused command and search input at the bottom."""
+
+    def compose(self) -> ComposeResult:
+        yield Static(" › ", id="input-prefix")
+        yield Input(placeholder="Type command or search...", id="input-field")
 
 
 # ── Main App ───────────────────────────────────────────────
@@ -813,13 +793,11 @@ class OriginTUI(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
-        Binding("tab", "next_view", "Next View"),
-        Binding("shift+tab", "prev_view", "Prev View"),
-        Binding("slash", "open_search", "Search", key_display="/"),
-        Binding("ctrl+k", "open_palette", "Palette", key_display="Ctrl+K"),
-        Binding("a", "accept_decision", "Accept"),
-        Binding("r", "reject_decision", "Reject"),
-        Binding("i", "toggle_inspector", "Toggle Inspector"),
+        Binding("escape", "escape_action", "Escape", show=False),
+        Binding("slash", "focus_input", "Search", show=False),
+        Binding("a", "accept_decision", "Accept", show=False),
+        Binding("r", "reject_decision", "Reject", show=False),
+        Binding("i", "toggle_inspector", "Toggle Inspector", show=False),
     ]
 
     show_inspector_narrow = reactive(False)
@@ -847,17 +825,18 @@ class OriginTUI(App):
         return self.size.width < 80
 
     def compose(self) -> ComposeResult:
-        yield Static("", id="header-bar")
+        yield HeaderBar(id="header-bar")
         
         with ContentSwitcher(initial="overview", id="main-switcher"):
-            yield OverviewView(id="overview")
+            yield HomeView(id="overview")
             yield ContextView(id="context")
             yield DecisionsView(id="decisions")
             yield KnowledgeView(id="knowledge")
             yield TimelineView(id="timeline")
+            yield SearchResultsView(id="search")
             
         yield Static("", id="status-message")
-        yield Footer()
+        yield CommandInput(id="command-input")
 
     def on_mount(self) -> None:
         if self.show_splash:
@@ -867,8 +846,14 @@ class OriginTUI(App):
         self._render_all()
         self._update_layout_classes()
 
+        # Initialize dir change state to prevent false positive reload on first poll
+        self._check_dir_changes()
+
         # Check doctor inline output initially
-        self.query_one("#overview", OverviewView).run_doctor_checks()
+        self.query_one("#overview", HomeView).run_doctor_checks()
+
+        # Focus input field immediately and keep it focused
+        self.query_one("#input-field", Input).focus()
 
         # Polling for data refreshes
         self._refresh_timer = self.set_interval(2.0, self._poll_for_changes)
@@ -893,6 +878,148 @@ class OriginTUI(App):
             self.add_class("show-inspector")
         else:
             self.remove_class("show-inspector")
+
+    # ── Key Handling for Navigation ───────────────────────────
+    def on_key(self, event) -> None:
+        if event.key in ("up", "down"):
+            current_view_id = self.query_one("#main-switcher", ContentSwitcher).current
+            if current_view_id == "decisions":
+                lst = self.query_one("#decisions-list", ListView)
+                if event.key == "up":
+                    lst.action_cursor_up()
+                else:
+                    lst.action_cursor_down()
+                event.prevent_default()
+            elif current_view_id == "knowledge":
+                lst = self.query_one("#knowledge-list", ListView)
+                if event.key == "up":
+                    lst.action_cursor_up()
+                else:
+                    lst.action_cursor_down()
+                event.prevent_default()
+            elif current_view_id == "timeline":
+                lst = self.query_one("#timeline-list", ListView)
+                if event.key == "up":
+                    lst.action_cursor_up()
+                else:
+                    lst.action_cursor_down()
+                event.prevent_default()
+            elif current_view_id == "search":
+                lst = self.query_one("#search-list", ListView)
+                if event.key == "up":
+                    lst.action_cursor_up()
+                else:
+                    lst.action_cursor_down()
+                event.prevent_default()
+
+    # ── Input Bar Event Handlers ──────────────────────────────
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "input-field":
+            return
+        
+        val = event.value.strip()
+        if not val:
+            current_view_id = self.query_one("#main-switcher", ContentSwitcher).current
+            if current_view_id == "search":
+                self.switch_view("overview")
+            return
+
+        # Check if it starts with "/" and is a prefix of or matches a known command
+        is_known_command = False
+        for cmd in ["/d", "/decisions", "/k", "/knowledge", "/t", "/timeline", "/c", "/context", "/doctor", "/export", "/accept", "/reject", "/help", "/q", "/quit"]:
+            if cmd.startswith(val) or val.startswith(cmd):
+                is_known_command = True
+                break
+
+        if val.startswith("/") and is_known_command:
+            return
+
+        # Search mode
+        query_val = val
+        if query_val.startswith("/"):
+            query_val = query_val[1:]
+
+        self.switch_view("search")
+        try:
+            results = use_cases.search_artifacts(self.workspace_root, query_val)
+            self.query_one("#search", SearchResultsView).populate(results)
+        except Exception as e:
+            self.query_one("#search", SearchResultsView).populate([])
+            self._show_status(f"Search error: {e}")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "input-field":
+            return
+        
+        val = event.value.strip()
+        if not val:
+            return
+
+        if val.startswith("/"):
+            parts = val.split(maxsplit=1)
+            cmd = parts[0]
+
+            is_known = cmd in ("/d", "/decisions", "/k", "/knowledge", "/t", "/timeline", "/c", "/context", "/doctor", "/export", "/accept", "/reject", "/help", "/q", "/quit")
+            if is_known:
+                if cmd in ("/d", "/decisions"):
+                    self.switch_view("decisions")
+                    event.input.value = ""
+                elif cmd in ("/k", "/knowledge"):
+                    self.switch_view("knowledge")
+                    event.input.value = ""
+                elif cmd in ("/t", "/timeline"):
+                    self.switch_view("timeline")
+                    event.input.value = ""
+                elif cmd in ("/c", "/context"):
+                    self.switch_view("context")
+                    event.input.value = ""
+                elif cmd == "/doctor":
+                    self.switch_view("overview")
+                    self.query_one("#overview", HomeView).run_doctor_checks()
+                    event.input.value = ""
+                elif cmd == "/export":
+                    target = "generic"
+                    if len(parts) > 1:
+                        val_target = parts[1].strip().lower()
+                        if val_target in ("claude-code", "claude", "cc"):
+                            target = "claude-code"
+                        elif val_target in ("cursor", "cur"):
+                            target = "cursor"
+                        elif val_target in ("generic", "gen"):
+                            target = "generic"
+                    try:
+                        dest = export_flat_file(self.workspace_root, target)
+                        self._show_status(f"Exported to {os.path.basename(dest)}")
+                    except Exception as e:
+                        self._show_status(f"Export failed: {e}")
+                    event.input.value = ""
+                elif cmd == "/accept":
+                    self.action_accept_decision()
+                    event.input.value = ""
+                elif cmd == "/reject":
+                    self.action_reject_decision()
+                    event.input.value = ""
+                elif cmd in ("/q", "/quit"):
+                    self.exit()
+                elif cmd == "/help":
+                    self.switch_view("overview")
+                    event.input.value = ""
+                return
+
+        current_view_id = self.query_one("#main-switcher", ContentSwitcher).current
+        if current_view_id == "search":
+            selected = self.query_one("#search", SearchResultsView).get_selected_result()
+            if selected:
+                self._handle_search_result(selected)
+                event.input.value = ""
+        elif current_view_id == "decisions":
+            lst = self.query_one("#decisions-list", ListView)
+            if lst.highlighted_child:
+                lst.select(lst.highlighted_child)
+        elif current_view_id == "knowledge":
+            lst = self.query_one("#knowledge-list", ListView)
+            if lst.highlighted_child:
+                lst.select(lst.highlighted_child)
 
     # ── Data loading and polling ───────────────────────────
     def _load_all_data(self) -> None:
@@ -919,8 +1046,6 @@ class OriginTUI(App):
             self._timeline = []
 
     def _render_all(self) -> None:
-        self._render_header()
-        
         # Get workspace metrics
         try:
             config = load_config(self.workspace_root)
@@ -931,40 +1056,40 @@ class OriginTUI(App):
         git = GitHelper(self.workspace_root)
         branch = git.get_current_branch() or "no git"
 
-        # Dynamically compute recently active agents
-        now = datetime.now(timezone.utc)
-        recent_agents = set()
-        for e in self._timeline:
-            dt = e.created_at
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            if (now - dt).total_seconds() < 7200:  # 2 hours
-                recent_agents.add(e.originating_agent)
-        active_agents = max(1, len(recent_agents))
-
-        # 1. Update Overview View
-        self.query_one("#overview", OverviewView).update_data(
-            ws_name, branch, active_agents, self._all_decisions, self._memories, self._timeline
+        # Update HeaderBar
+        health_glyph, health_style = self._compute_health()
+        view_label = self.views_cycle[self.current_view_idx]
+        self.query_one("#header-bar", HeaderBar).update_header(
+            ws_name, branch, health_glyph, health_style, view_label
         )
 
-        # 2. Update Context View
+        # Update HomeView (overview)
+        proposed_cnt = len([d for d in self._all_decisions if d.status == "proposed"])
+        active_cnt = len([d for d in self._all_decisions if d.status == "active"])
+        memory_cnt = len(self._memories)
+        
+        self.query_one("#overview", HomeView).query_one("#welcome-card", WelcomeCard).update_data(
+            ws_name, branch, health_glyph, health_style,
+            proposed_cnt, active_cnt, memory_cnt, self._timeline
+        )
+
+        # Update Context View
         try:
             bundle = use_cases.get_context_bundle(self.workspace_root)
         except Exception as e:
             bundle = f"Failed to load context bundle: {e}"
         self.query_one("#context", ContextView).update_data(bundle)
 
-        # 3. Update Decisions View
+        # Update Decisions View
         self.query_one("#decisions", DecisionsView).populate(self._all_decisions)
 
-        # 4. Update Knowledge View
+        # Update Knowledge View
         self.query_one("#knowledge", KnowledgeView).populate(self._memories)
 
-        # 5. Update Timeline View
+        # Update Timeline View
         self.query_one("#timeline", TimelineView).populate(self._timeline, self._all_decisions)
 
     def _render_header(self) -> None:
-        header = self.query_one("#header-bar", Static)
         try:
             config = load_config(self.workspace_root)
             ws_name = config.workspace_name
@@ -974,29 +1099,10 @@ class OriginTUI(App):
         git = GitHelper(self.workspace_root)
         branch = git.get_current_branch() or "no git"
 
-        # Health glyph
         health_glyph, health_style = self._compute_health()
-
-        # Get recent agents count
-        now = datetime.now(timezone.utc)
-        recent_agents = set()
-        for e in self._timeline:
-            dt = e.created_at
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            if (now - dt).total_seconds() < 7200:
-                recent_agents.add(e.originating_agent)
-        agent_cnt = max(1, len(recent_agents))
-
-        # Current view name
         view_label = self.views_cycle[self.current_view_idx]
-
-        header.update(
-            f"  {BRAND_GLYPH}  "
-            f"[bold #00ffd2]{ws_name}[/]  "
-            f"[#4d4d4d]⎇ {branch}[/]  "
-            f"[{health_style}]{health_glyph}[/]  "
-            f"[#4d4d4d]{view_label}[/]"
+        self.query_one("#header-bar", HeaderBar).update_header(
+            ws_name, branch, health_glyph, health_style, view_label
         )
 
     def _compute_health(self) -> tuple[str, str]:
@@ -1028,13 +1134,10 @@ class OriginTUI(App):
             return "●", "#00ffd2"
 
     def _poll_for_changes(self) -> None:
-        
-        # Only re-load data and re-render lists if files changed
         if self._check_dir_changes():
             self._load_all_data()
             self._render_all()
-            # Also re-run doctor checks when data changes
-            self.query_one("#overview", OverviewView).run_doctor_checks()
+            self.query_one("#overview", HomeView).run_doctor_checks()
         else:
             self._render_header()
 
@@ -1070,7 +1173,6 @@ class OriginTUI(App):
 
         return changed
 
-
     def _show_status(self, message: str, duration: float = 3.0) -> None:
         status = self.query_one("#status-message", Static)
         status.update(f"[#e2a855]{message}[/]")
@@ -1084,21 +1186,26 @@ class OriginTUI(App):
 
     # ── Keybinding and Navigation Actions ──────────────────
     def switch_view(self, view_name: str) -> None:
-        if view_name in self.views_cycle:
-            self.current_view_idx = self.views_cycle.index(view_name)
+        if view_name in self.views_cycle or view_name == "search":
+            if view_name != "search":
+                self.current_view_idx = self.views_cycle.index(view_name)
             self.query_one("#main-switcher", ContentSwitcher).current = view_name
-            self._show_status(f"Switched view to {view_name.upper()}")
+            self._render_header()
 
-    def action_next_view(self) -> None:
-        self.current_view_idx = (self.current_view_idx + 1) % len(self.views_cycle)
-        self.switch_view(self.views_cycle[self.current_view_idx])
+    def action_focus_input(self) -> None:
+        inp = self.query_one("#input-field", Input)
+        inp.focus()
+        if not inp.value.startswith("/"):
+            inp.value = "/"
+            inp.cursor_position = 1
 
-    def action_prev_view(self) -> None:
-        self.current_view_idx = (self.current_view_idx - 1) % len(self.views_cycle)
-        self.switch_view(self.views_cycle[self.current_view_idx])
-
-    def action_open_search(self) -> None:
-        self.push_screen(SearchOverlay(), self._handle_search_result)
+    def action_escape_action(self) -> None:
+        inp = self.query_one("#input-field", Input)
+        if inp.value:
+            inp.value = ""
+            self.switch_view("overview")
+        else:
+            self.switch_view("overview")
 
     def _handle_search_result(self, result: Any) -> None:
         if not result:
@@ -1110,36 +1217,6 @@ class OriginTUI(App):
         elif hasattr(result, "type") and result.type == "memory":
             self.switch_view("knowledge")
             self.query_one("#knowledge", KnowledgeView).select_memory(result.category, result.key)
-
-    def action_open_palette(self) -> None:
-        self.push_screen(CommandPaletteModal(), self._handle_command_palette_action)
-
-    def _handle_command_palette_action(self, action: Optional[str]) -> None:
-        if not action:
-            return
-
-        if action.startswith("jump_"):
-            target_view = action.split("_")[1]
-            if target_view == "knowledge":
-                target_view = "knowledge"
-            self.switch_view(target_view)
-        elif action == "accept_decision":
-            self.action_accept_decision()
-        elif action == "reject_decision":
-            self.action_reject_decision()
-        elif action == "search_workspace":
-            self.action_open_search()
-        elif action == "generate_export":
-            try:
-                dest = export_flat_file(self.workspace_root, "generic")
-                self._show_status(f"Exported to {os.path.basename(dest)}")
-            except Exception as e:
-                self._show_status(f"Export failed: {e}")
-        elif action == "run_doctor":
-            self.switch_view("overview")
-            self.query_one("#overview", OverviewView).run_doctor_checks()
-        elif action == "quit":
-            self.exit()
 
     def action_accept_decision(self) -> None:
         dec_view = self.query_one("#decisions", DecisionsView)

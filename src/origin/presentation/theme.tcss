@@ -1,84 +1,146 @@
-/* Origin TUI — Event Horizon Theme v3 */
-/* Modern CLI aesthetic: bright cyan = active/focused only. */
-/* Everything else recedes into dim accent or muted gray. */
+/* Origin TUI — Claude Code Style Cyan Theme */
 
 Screen {
-    background: #000000;
+    background: #0d0d0d;
 }
 
 /* ── Header ────────────────────────────────────────────── */
 #header-bar {
     dock: top;
-    height: 3;
-    background: #000000;
-    color: #4d4d4d;
-    padding: 0 2;
-    border-bottom: solid #111111;
+    height: 6;
+    background: #0d0d0d;
+    color: #777777;
+    padding: 0 2 0 2;
+    border-bottom: solid #1e1e1e;
 }
 
 /* ── Content Switcher ──────────────────────────────────── */
 #main-switcher {
     height: 1fr;
-    background: #000000;
+    background: #0d0d0d;
 }
 
-/* ── Overview View ────────────────────────────────────── */
-.overview-section {
-    background: #000000;
-    padding: 0 2;
+/* ── Welcome Screen (HomeView) ─────────────────────────── */
+HomeView {
+    padding: 1 2;
+}
+
+#welcome-card {
+    background: #141414;
+    border: solid #00ffd2;
+    padding: 1 2;
+    height: 16;
+    margin-bottom: 1;
+}
+
+#welcome-title {
+    color: #ffffff;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#welcome-content {
+    height: 1fr;
+}
+
+#welcome-brand {
+    width: 40%;
+    height: 100%;
+    align: center middle;
+}
+
+#welcome-art {
+    width: 100%;
+    height: 9;
+    content-align: center middle;
+}
+
+#welcome-logo {
+    color: #00ffd2;
+    text-style: bold;
+    content-align: center middle;
+    margin-top: 1;
+}
+
+#welcome-tagline {
+    color: #777777;
+    content-align: center middle;
+}
+
+#welcome-stats-pane {
+    width: 60%;
+    height: 100%;
+    padding-left: 4;
+}
+
+#welcome-metadata {
+    height: auto;
+    color: #777777;
+    margin-bottom: 1;
+}
+
+#welcome-metrics {
+    height: auto;
+    color: #777777;
+    margin-bottom: 1;
+}
+
+#welcome-activity-header {
+    color: #888888;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#welcome-timeline-feed {
+    height: 1fr;
+}
+
+#command-hints {
+    color: #c0c0c0;
+    background: #0d0d0d;
+    padding: 1 0;
     margin-bottom: 1;
 }
 
 .section-header {
-    color: #0a4a42;
+    color: #888888;
     text-style: bold;
-}
-
-.section-rule {
-    color: #111111;
-}
-
-#overview-stat-line {
     margin-top: 1;
     margin-bottom: 1;
 }
 
 .diagnostics-panel {
-    height: auto;
-    max-height: 10;
-    background: #000000;
-    padding: 0 0;
-}
-
-#overview-timeline-feed {
-    padding: 0 0;
+    height: 8;
+    background: #141414;
+    padding: 1 2;
+    border: solid #1e1e1e;
 }
 
 /* ── Context View ──────────────────────────────────────── */
 #context-markdown {
-    background: #000000;
+    background: #0d0d0d;
     padding: 1 2;
 }
 
 /* ── List Views & Inspector Layout ─────────────────────── */
 .list-pane {
-    background: #000000;
+    background: #0d0d0d;
     padding: 0 1;
 }
 
 .inspector-pane {
-    background: #000000;
+    background: #141414;
     padding: 1 2;
 }
 
-/* Responsive Class Toggling rules */
+/* Responsive Layout */
 .wide .list-pane {
     width: 60%;
 }
 
 .wide .inspector-pane {
     width: 40%;
-    border-left: solid #111111;
+    border-left: solid #1e1e1e;
 }
 
 .narrow .inspector-pane {
@@ -94,147 +156,90 @@ Screen {
     display: none;
 }
 
-/* ── Panel Title (used in list views) ─────────────────── */
-.panel-title {
-    color: #0a4a42;
-    text-style: bold;
-    margin-bottom: 1;
-}
-
-/* ── ListView & Scrollbars ────────────────────────────── */
+/* ── ListViews & Scrollbars ────────────────────────────── */
 ListView {
-    background: #000000;
-    scrollbar-background: #000000;
-    scrollbar-color: #111111;
-    scrollbar-color-active: #0a4a42;
-    scrollbar-color-hover: #0a4a42;
+    background: #0d0d0d;
+    scrollbar-background: #0d0d0d;
+    scrollbar-color: #1e1e1e;
+    scrollbar-color-active: #00ffd2;
+    scrollbar-color-hover: #00ffd2;
 }
 
 ListView > ListItem {
-    background: #000000;
+    background: #0d0d0d;
+    padding: 0 1;
 }
 
 ListView > ListItem.--highlight {
-    background: #0a1a16;
-    color: #00ffd2;
+    background: #1e1e1e;
+    color: #ffffff;
 }
 
 ListView:focus > ListItem.--highlight {
-    background: #0a4a42;
+    background: #262626;
     color: #00ffd2;
     text-style: bold;
 }
 
 /* Day header inside timeline list */
 .day-header {
-    background: #000000;
-    color: #0a4a42;
+    background: #0d0d0d;
+    color: #777777;
     text-style: bold;
     margin-top: 1;
-}
-
-/* ── Command Palette Overlay ──────────────────────────── */
-/* Dim border at rest, bright on focus-within */
-#command-palette {
-    align: center middle;
-    width: 70;
-    height: 25;
-    background: #050505;
-    border: heavy #0a4a42;
-    padding: 1 2;
-}
-
-#command-palette:focus-within {
-    border: heavy #00ffd2;
-}
-
-#command-palette-title {
-    color: #0a4a42;
-    text-style: bold;
     margin-bottom: 1;
-    content-align: center middle;
 }
 
-#command-palette-list {
-    height: 1fr;
-    background: #050505;
-    border-top: solid #111111;
+/* ── Command Input Bar at Bottom ────────────────────────── */
+#command-input {
+    dock: bottom;
+    height: 3;
+    background: #0d0d0d;
+    border-top: solid #1e1e1e;
+    layout: horizontal;
+    padding: 0 1;
 }
 
-/* ── Search Overlay ──────────────────────────────────── */
-/* Dim border at rest, bright on focus-within */
-#search-overlay-container {
-    align: center middle;
-    width: 80;
-    height: 25;
-    background: #050505;
-    border: heavy #0a4a42;
-    padding: 1 2;
-}
-
-#search-overlay-container:focus-within {
-    border: heavy #00ffd2;
-}
-
-#search-overlay-title {
-    color: #0a4a42;
-    text-style: bold;
-    margin-bottom: 1;
-    content-align: center middle;
-}
-
-#search-overlay-list {
-    height: 1fr;
-    background: #050505;
-    border-top: solid #111111;
-}
-
-/* ── Textual Input overrides ────────────────────────────── */
-Input {
-    background: #050505;
-    border: tall #111111;
+#input-prefix {
     color: #00ffd2;
-    margin-bottom: 1;
+    text-style: bold;
+    margin-top: 1;
+    width: auto;
 }
 
-Input:focus {
-    border: tall #00ffd2;
+#input-field {
+    background: #0d0d0d;
+    border: none;
+    color: #ffffff;
+    width: 1fr;
+    height: 1;
+    margin-top: 1;
+    padding: 0;
+}
+
+#input-field:focus {
+    border: none;
 }
 
 /* ── Status Bar / Status message ─────────────────────────── */
 #status-message {
     dock: bottom;
     height: 1;
-    background: #000000;
+    background: #0d0d0d;
     color: #e2a855;
     padding: 0 2;
 }
 
-/* ── Footer ────────────────────────────────────────────── */
-Footer {
-    background: #000000;
-    color: #4d4d4d;
-}
-
-Footer > .footer--highlight {
-    background: #0a4a42;
-    color: #00ffd2;
-}
-
-Footer > .footer--key {
-    background: #111111;
-    color: #0a4a42;
-}
-
-Footer > .footer--description {
-    color: #4d4d4d;
-}
-
 /* ── Splash Screen ─────────────────────────────────────── */
+#splash-screen {
+    background: #0d0d0d;
+    align: center middle;
+}
+
 #splash-art {
     width: 100%;
     height: 100%;
     align: center middle;
     content-align: center middle;
-    background: #000000;
+    background: #0d0d0d;
 }

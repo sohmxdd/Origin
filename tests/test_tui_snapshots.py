@@ -210,6 +210,20 @@ def test_search_overlay_snapshot(snap_compare):
     
     add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "human", "active")
 
-    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
-        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
-        assert snap_compare(app, press=("slash", "D", "a", "t", "a"))
+    from origin.application import use_cases
+    original_search = use_cases.search_artifacts
+
+    def mocked_search(root, query):
+        results = original_search(root, query)
+        fixed_dt = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
+        for i, res in enumerate(results):
+            if hasattr(res, "type") and res.type == "decision":
+                res.id = f"dec_test_id_{i}"
+                res.created_at = fixed_dt
+                res.updated_at = fixed_dt
+        return results
+
+    with patch("origin.presentation.tui.use_cases.search_artifacts", side_effect=mocked_search):
+        with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+            app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+            assert snap_compare(app, press=("slash", "D", "a", "t", "a"))

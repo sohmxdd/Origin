@@ -241,3 +241,21 @@ async def test_tui_narrow_layout(tui_workspace):
         # Assert App has narrow class
         assert "narrow" in app.classes
         assert "wide" not in app.classes
+
+
+@pytest.mark.asyncio
+async def test_tui_quit_command(tui_workspace):
+    """Verify typing '/quit' exits the application."""
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
+    async with app.run_test() as pilot:
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
+        # Type "/quit" command in the input field
+        await pilot.press("slash")
+        await pilot.press("q", "u", "i", "t")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        # The app should exit and return None
+        assert app.return_value is None
