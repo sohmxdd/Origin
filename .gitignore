@@ -56,3 +56,5 @@ demo_workspace/
 tmp/
 origin logo
 tmp_snapshot_*
+snapshot_report.html
+*_report.html

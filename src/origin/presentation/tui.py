@@ -269,12 +269,7 @@ class HeaderBar(Static):
         return self._info_text
 
     def update_header(self, ws_name: str, branch: str, health_glyph: str, health_style: str, view_label: str) -> None:
-        info_text = (
-            f"[bold #00ffd2]● ORIGIN[/]  [#444444]v1.0[/]  "
-            f"[#777777]Workspace:[/] [#00ffd2]{ws_name}[/]  "
-            f"[#777777]Branch:[/] [#00ffd2]{branch}[/]  "
-            f"[#777777]Health:[/] [{health_style}]{health_glyph}[/]"
-        )
+        info_text = f"[bold #00ffd2]● ORIGIN[/]  [#444444]v1.0[/]"
         view_text = f"[bold #00ffd2]{view_label.upper()}[/]  [#444444]·[/]  [#777777]Unified memory for your agents.[/]"
         self._info_text = info_text
 
@@ -324,9 +319,9 @@ class WelcomeCard(Container):
     def update_data(self, workspace_name: str, branch: str, health_glyph: str, health_style: str,
                     proposed_cnt: int, active_cnt: int, memory_cnt: int, timeline: list[TimelineEvent]) -> None:
         metadata = (
+            f"[#777777]Version:[/]   [#00ffd2]v1.0[/]\n"
             f"[#777777]Workspace:[/] [#00ffd2]{workspace_name}[/]\n"
-            f"[#777777]Branch:[/]    [#00ffd2]{branch}[/]\n"
-            f"[#777777]Health:[/]    [{health_style}]{health_glyph} ok[/]"
+            f"[#777777]Branch:[/]    [#00ffd2]{branch}[/]"
         )
         self.query_one("#welcome-metadata", Static).update(metadata)
 
