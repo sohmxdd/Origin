@@ -113,19 +113,25 @@ def add_decision(
     decision.status = status  # type: ignore
     repo.save(decision)
 
-    # Create and save TimelineEvent
-    commit_sha = git.get_current_commit_sha()
-    event = TimelineEvent.create(
-        event_type="decision_created",
-        summary=f"Decision {status}: '{title}'",
-        originating_agent=originating_agent,
-        ref_artifact_id=decision.id,
-        commit_sha=commit_sha,
-    )
-    repo.save(event)
+    try:
+        # Create and save TimelineEvent
+        commit_sha = git.get_current_commit_sha()
+        event = TimelineEvent.create(
+            event_type="decision_created",
+            summary=f"Decision {status}: '{title}'",
+            originating_agent=originating_agent,
+            ref_artifact_id=decision.id,
+            commit_sha=commit_sha,
+        )
+        repo.save(event)
 
-    # Refresh mirrors
-    mirror.refresh_all(repo)
+        # Refresh mirrors
+        mirror.refresh_all(repo)
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
 
     return decision
 
@@ -185,19 +191,25 @@ def supersede_decision(
     # Link old decision to new decision
     repo.update_status(old_decision_id, status="superseded", superseded_by=new_decision.id)
 
-    # Create and save TimelineEvent
-    commit_sha = git.get_current_commit_sha()
-    event = TimelineEvent.create(
-        event_type="decision_superseded",
-        summary=f"Decision superseded: '{old_artifact.title}' by '{title}' ({new_decision.id})",
-        originating_agent=originating_agent,
-        ref_artifact_id=old_decision_id,
-        commit_sha=commit_sha,
-    )
-    repo.save(event)
+    try:
+        # Create and save TimelineEvent
+        commit_sha = git.get_current_commit_sha()
+        event = TimelineEvent.create(
+            event_type="decision_superseded",
+            summary=f"Decision superseded: '{old_artifact.title}' by '{title}' ({new_decision.id})",
+            originating_agent=originating_agent,
+            ref_artifact_id=old_decision_id,
+            commit_sha=commit_sha,
+        )
+        repo.save(event)
 
-    # Refresh mirrors
-    mirror.refresh_all(repo)
+        # Refresh mirrors
+        mirror.refresh_all(repo)
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
 
     return new_decision
 
@@ -248,19 +260,25 @@ def set_memory(
 
     repo.save(entry)
 
-    # Create and save TimelineEvent
-    commit_sha = git.get_current_commit_sha()
-    event = TimelineEvent.create(
-        event_type="memory_updated",
-        summary=f"Memory updated: {category}.{key} = '{value}'",
-        originating_agent=originating_agent,
-        ref_artifact_id=entry.id,
-        commit_sha=commit_sha,
-    )
-    repo.save(event)
+    try:
+        # Create and save TimelineEvent
+        commit_sha = git.get_current_commit_sha()
+        event = TimelineEvent.create(
+            event_type="memory_updated",
+            summary=f"Memory updated: {category}.{key} = '{value}'",
+            originating_agent=originating_agent,
+            ref_artifact_id=entry.id,
+            commit_sha=commit_sha,
+        )
+        repo.save(event)
 
-    # Refresh mirrors
-    mirror.refresh_all(repo)
+        # Refresh mirrors
+        mirror.refresh_all(repo)
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
 
     return entry
 
@@ -330,16 +348,22 @@ def accept_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
     decision.originating_agent = agent
     repo.save(decision)
 
-    commit_sha = git.get_current_commit_sha()
-    event = TimelineEvent.create(
-        event_type="decision_created",
-        summary=f"Decision accepted: '{decision.title}'",
-        originating_agent=agent,
-        ref_artifact_id=decision.id,
-        commit_sha=commit_sha,
-    )
-    repo.save(event)
-    mirror.refresh_all(repo)
+    try:
+        commit_sha = git.get_current_commit_sha()
+        event = TimelineEvent.create(
+            event_type="decision_created",
+            summary=f"Decision accepted: '{decision.title}'",
+            originating_agent=agent,
+            ref_artifact_id=decision.id,
+            commit_sha=commit_sha,
+        )
+        repo.save(event)
+        mirror.refresh_all(repo)
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
     return decision
 
 
@@ -364,16 +388,22 @@ def reject_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
     decision.originating_agent = agent
     repo.save(decision)
 
-    commit_sha = git.get_current_commit_sha()
-    event = TimelineEvent.create(
-        event_type="decision_superseded",
-        summary=f"Decision rejected: '{decision.title}'",
-        originating_agent=agent,
-        ref_artifact_id=decision.id,
-        commit_sha=commit_sha,
-    )
-    repo.save(event)
-    mirror.refresh_all(repo)
+    try:
+        commit_sha = git.get_current_commit_sha()
+        event = TimelineEvent.create(
+            event_type="decision_superseded",
+            summary=f"Decision rejected: '{decision.title}'",
+            originating_agent=agent,
+            ref_artifact_id=decision.id,
+            commit_sha=commit_sha,
+        )
+        repo.save(event)
+        mirror.refresh_all(repo)
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
     return decision
 
 

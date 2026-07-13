@@ -41,6 +41,9 @@ def origin_get_context() -> str:
     try:
         return use_cases.get_context_bundle(root)
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error loading context: {e}"
 
 
@@ -81,6 +84,9 @@ def origin_add_decision(
         )
         return f"Successfully recorded Decision {dec.id}: '{dec.title}' (Status: {dec.status}, Confidence: {dec.confidence:.2f})"
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error adding decision: {e}"
 
 
@@ -99,6 +105,9 @@ def origin_accept_decision(id: str) -> str:
         dec = use_cases.accept_decision(root, id, agent="mcp-server")
         return f"Successfully accepted proposed Decision {dec.id}: '{dec.title}'"
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error accepting decision: {e}"
 
 
@@ -117,6 +126,9 @@ def origin_reject_decision(id: str) -> str:
         dec = use_cases.reject_decision(root, id, agent="mcp-server")
         return f"Successfully rejected proposed Decision {dec.id}: '{dec.title}'"
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error rejecting decision: {e}"
 
 
@@ -148,6 +160,9 @@ def origin_list_decisions(status: str = "active") -> str:
             lines.append(f"[{dec.id}] {dec.title} (Confidence: {dec.confidence:.2f}){superseded_str}")
         return "\n".join(lines)
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error listing decisions: {e}"
 
 
@@ -188,6 +203,9 @@ def origin_supersede_decision(
         )
         return f"Successfully superseded {id} with Decision {dec.id}: '{dec.title}'"
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error superseding decision: {e}"
 
 
@@ -214,6 +232,9 @@ def origin_set_memory(category: str, key: str, value: str) -> str:
         )
         return f"Saved Memory Entry [{entry.id}]: {category}.{key} = '{value}'"
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error setting memory: {e}"
 
 
@@ -241,6 +262,9 @@ def origin_search(query: str) -> str:
                 lines.append(f"[{art.id}] Memory: {art.category}.{art.key} = '{art.value}'")
         return "\n".join(lines)
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         return f"Error performing search: {e}"
 
 
