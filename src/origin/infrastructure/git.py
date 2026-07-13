@@ -45,6 +45,29 @@ class GitHelper:
         except (subprocess.SubprocessError, FileNotFoundError):
             return None
 
+    def get_current_branch(self) -> Optional[str]:
+        """Retrieve the current branch name.
+
+        Returns:
+            The branch name, or None if not in a git repo or detached HEAD.
+        """
+        git_dir = os.path.join(self.workspace_path, ".git")
+        if not os.path.isdir(git_dir):
+            return None
+
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch = result.stdout.strip()
+            return branch if branch and branch != "HEAD" else None
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return None
+
     def install_hooks(self) -> bool:
         """Install a git pre-commit hook to automatically keep context files fresh.
 

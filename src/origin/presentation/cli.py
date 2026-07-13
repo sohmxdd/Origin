@@ -596,6 +596,19 @@ def mcp_config() -> None:
     typer.echo("3. If it is in a virtualenv, specify the absolute path to 'origin-mcp' in the 'command' field above.\n")
 
 
+@app.command("tui")
+def tui() -> None:
+    """Launch the interactive Origin TUI dashboard."""
+    root = find_workspace_root()
+    origin_dir = os.path.join(root, ".origin")
+    if not os.path.isdir(origin_dir):
+        typer.secho("Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    from origin.presentation.tui import run_tui
+    run_tui(workspace_root=root)
+
+
 def main() -> None:
     """Entry point for project script command."""
     app()

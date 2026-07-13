@@ -1,0 +1,223 @@
+/* Origin TUI — Event Horizon Theme */
+/* Near-black background, deep violet accents, minimal decoration */
+
+Screen {
+    background: #0a0a0f;
+}
+
+/* ── Header ────────────────────────────────────────────── */
+
+#header-bar {
+    dock: top;
+    height: 3;
+    background: #12121a;
+    color: #7f5af0;
+    text-style: bold;
+    padding: 0 2;
+    border-bottom: solid #1a1a2e;
+}
+
+#header-bar .label {
+    color: #6e6a86;
+}
+
+#singularity {
+    color: #7f5af0;
+    text-style: bold;
+}
+
+#health-ok {
+    color: #2cb67d;
+}
+
+#health-warn {
+    color: #e2b055;
+}
+
+#health-error {
+    color: #e25555;
+}
+
+/* ── Panels ────────────────────────────────────────────── */
+
+.panel {
+    background: #12121a;
+    border: heavy #1a1a2e;
+    padding: 0 1;
+}
+
+.panel-title {
+    color: #6e6a86;
+    text-style: bold;
+}
+
+/* Focus: pulsing border via class toggle */
+
+.pulse-a:focus-within {
+    border: heavy #7f5af0;
+}
+
+.pulse-b:focus-within {
+    border: heavy #3b2875;
+}
+
+/* Fallback focus without pulse class */
+
+.panel:focus-within {
+    border: heavy #7f5af0;
+}
+
+/* ── Decisions List ────────────────────────────────────── */
+
+#decisions-panel {
+    width: 60%;
+}
+
+#decisions-list {
+    background: #12121a;
+    scrollbar-background: #12121a;
+    scrollbar-color: #1a1a2e;
+    scrollbar-color-active: #7f5af0;
+    scrollbar-color-hover: #3b2875;
+}
+
+.decision-row {
+    height: 2;
+    padding: 0 1;
+    color: #c5c0d8;
+}
+
+.decision-row:hover {
+    background: #1a1a2e;
+}
+
+.decision-row.--highlight {
+    background: #1e1e30;
+}
+
+/* Status glyphs */
+
+.status-active {
+    color: #7f5af0;
+}
+
+.status-proposed {
+    color: #6e6a86;
+}
+
+.status-rejected {
+    color: #e25555;
+}
+
+.status-superseded {
+    color: #6e6a86;
+}
+
+/* ── Right panels ──────────────────────────────────────── */
+
+#right-column {
+    width: 40%;
+}
+
+#memory-panel {
+    height: 50%;
+}
+
+#timeline-panel {
+    height: 50%;
+}
+
+.memory-category {
+    color: #7f5af0;
+    text-style: bold;
+}
+
+.memory-entry {
+    color: #c5c0d8;
+    padding-left: 2;
+}
+
+.timeline-event {
+    color: #c5c0d8;
+    height: 2;
+    padding: 0 1;
+}
+
+.timeline-event:hover {
+    background: #1a1a2e;
+}
+
+.dim-text {
+    color: #6e6a86;
+}
+
+/* ── Detail Modal ──────────────────────────────────────── */
+
+#detail-modal {
+    align: center middle;
+    width: 70%;
+    height: 70%;
+    background: #12121a;
+    border: heavy #7f5af0;
+    padding: 1 2;
+}
+
+#detail-modal .title {
+    color: #7f5af0;
+    text-style: bold;
+}
+
+#detail-modal .label {
+    color: #6e6a86;
+    text-style: bold;
+}
+
+#detail-modal .value {
+    color: #c5c0d8;
+}
+
+/* ── Search Input ──────────────────────────────────────── */
+
+#search-input {
+    dock: top;
+    height: 3;
+    background: #1a1a2e;
+    border: heavy #7f5af0;
+    color: #c5c0d8;
+    display: none;
+}
+
+#search-input.visible {
+    display: block;
+}
+
+/* ── Status Message Bar ────────────────────────────────── */
+
+#status-message {
+    dock: bottom;
+    height: 1;
+    background: #12121a;
+    color: #e2b055;
+    padding: 0 2;
+}
+
+/* ── Footer ────────────────────────────────────────────── */
+
+Footer {
+    background: #12121a;
+    color: #6e6a86;
+}
+
+Footer > .footer--highlight {
+    background: #7f5af0;
+    color: #0a0a0f;
+}
+
+Footer > .footer--key {
+    background: #3b2875;
+    color: #c5c0d8;
+}
+
+Footer > .footer--description {
+    color: #6e6a86;
+}

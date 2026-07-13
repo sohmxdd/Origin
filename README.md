@@ -10,18 +10,20 @@
 
 ## 🛠️ System Architecture
 
-Origin links your CLI inputs or AI agent MCP tool calls directly into an application service layer backed by a single-table SQLite database. Change details are mirrored into clean Markdown files committed directly to Git, which agents read naturally.
+Origin stores each artifact as an individual YAML file (git-mergeable, human-readable), backed by a rebuildable SQLite query cache. Three thin adapter layers — CLI, MCP server, and interactive TUI — all route through a shared application service layer. Markdown mirrors are committed to Git for agent consumption.
 
 ```mermaid
 graph TD
     subgraph Client ["Developer Environments & Agents"]
-        CLI["origin CLI (Developer/CI)"]
-        Agent["AI Agent (Claude Code, Cursor, etc.)"]
+        CLI["origin CLI"]
+        TUI["origin tui (Interactive Dashboard)"]
+        Agent["AI Agent (Claude Code, Cursor)"]
     end
 
     subgraph OriginCore ["Origin Core Layer"]
         App["Application Layer (Use Cases)"]
-        DB[(SQLite db: workspace.db)]
+        YAML["YAML Files (Source of Truth)"]
+        DB[(SQLite Index Cache)]
         Mirror["Mirror Writer"]
     end
 
@@ -30,22 +32,21 @@ graph TD
     end
 
     subgraph Exports ["Flat-File Context Mirroring"]
-        CLAUDE["CLAUDE.md (Claude Code)"]
-        Cursor[".cursorrules (Cursor Rules)"]
-        Generic["ORIGIN.md (Stand-alone context)"]
+        CLAUDE["CLAUDE.md"]
+        Cursor[".cursorrules"]
+        Generic["ORIGIN.md"]
     end
 
     CLI --> App
+    TUI --> App
     Agent <-->|MCP Protocol StdIO| App
-    App <--> DB
+    App <--> YAML
+    YAML --> DB
     App --> Mirror
     Mirror --> CLAUDE
     Mirror --> Cursor
     Mirror --> Generic
-    CLAUDE --> Repo
-    Cursor --> Repo
-    Generic --> Repo
-    DB --> Repo
+    YAML --> Repo
 ```
 
 ---
@@ -111,26 +112,55 @@ origin decision supersede dec_01KXBTA5DD6... \
 
 ---
 
+## 🖥️ Interactive TUI Dashboard
+
+Launch a real-time terminal dashboard with `origin tui`. It surfaces all decisions, memory, and timeline data in a keyboard-navigable three-panel layout.
+
+```bash
+origin tui
+```
+
+### Keybindings
+
+| Key | Action |
+| :--- | :--- |
+| `↑`/`↓` or `j`/`k` | Navigate the decisions list |
+| `Enter` | View full decision detail (rationale, alternatives, files) |
+| `a` | Accept a proposed decision |
+| `r` | Reject a proposed decision |
+| `/` | Search across decisions (ESC to clear) |
+| `d` | Show full doctor diagnostics |
+| `q` | Quit |
+
+### What you see
+
+- **Left panel**: All decisions with status glyphs (`●` active, `◌` proposed, `✕` rejected, `↺` superseded)
+- **Top-right**: Memory entries grouped by category (collapsible)
+- **Bottom-right**: Activity timeline (newest first, auto-refreshing)
+- **Header**: Workspace name, git branch, health indicator, singularity rotation glyph
+
+The TUI auto-polls for changes every 2 seconds — if another agent session writes a decision via MCP while you're watching, it appears automatically.
+
+To try it with a pre-populated workspace:
+```bash
+python demo_tui.py
+```
+
+---
+
 ## 🔌 Utilizing the MCP Server
 
 Origin includes a built-in Model Context Protocol (MCP) server allowing AI agents to query and add project memory directly.
 
-### Get registration snippet
+### Quickest setup
+```bash
+origin connect claude-code
+```
+This exports context to `CLAUDE.md` and auto-configures `~/.claude.json` with the MCP server entry. For Cursor, use `origin connect cursor`.
+
+### Manual registration
 ```bash
 origin mcp-config
-```
-This prints the JSON configuration snippet to register the `origin-mcp` command with Claude Code or Claude Desktop.
-
-Example configuration:
-```json
-{
-  "mcpServers": {
-    "origin-memory": {
-      "command": "origin-mcp",
-      "args": []
-    }
-  }
-}
 ```
 
 ### Available MCP Tools:
@@ -147,16 +177,24 @@ Example configuration:
 
 | Command | Description |
 | :--- | :--- |
-| `origin init` | Creates `.origin/` folder, configuration, and SQLite store |
+| `origin init` | Creates `.origin/` folder, YAML directories, and SQLite cache |
+| `origin tui` | Launch the interactive terminal dashboard |
 | `origin decision add` | Record new architecture decision (interactive or flags) |
-| `origin decision list` | Lists decisions filtered by status (active/superseded) |
-| `origin decision supersede <id>` | Marks old decision as superseded and links a new one |
+| `origin decision add --propose` | Record as a proposed decision (pending human review) |
+| `origin decision accept <id>` | Accept and activate a proposed decision |
+| `origin decision reject <id>` | Reject a proposed decision |
+| `origin decision list` | Lists decisions filtered by status |
+| `origin decision list --affects <f>` | Filter decisions by affected file path |
+| `origin decision supersede <id>` | Supersede an old decision with a new one |
 | `origin memory set <cat> <key> <val>`| Stores or updates a project memory entry |
 | `origin memory get <cat> <key>` | Prints the raw value of a memory key to stdout |
 | `origin context` | Prints the compiled context bundle |
-| `origin search <query>` | Keywords search across decisions and memories |
+| `origin search <query>` | Keyword search across decisions and memories |
 | `origin export --target <target>` | Exports context to `claude-code`, `cursor`, or `generic` |
-| `origin doctor` | Workspace sanity check, git status, and integrity diagnostics |
+| `origin connect <target>` | Export context + auto-configure editor MCP integration |
+| `origin doctor` | Workspace integrity check and diagnostics |
+| `origin doctor --fix` | Rebuild SQLite index from YAML files and regenerate mirrors |
+| `origin migrate` | Migrate a v1.0 workspace to v2.0 filesystem-first format |
 
 ---
 
