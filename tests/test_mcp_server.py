@@ -215,3 +215,125 @@ def test_mcp_stdio_json_rpc(mcp_workspace):
         proc.wait(timeout=5)
 
 
+def test_mcp_full_tool_call_under_tui_load(mcp_workspace):
+    """Verify that MCP tool calls (add, reject) succeed end-to-end under concurrent TUI polling."""
+    import subprocess
+    import sys
+    import json
+    import time
+    import threading
+
+    # Create a concurrent background reader thread to simulate TUI polling/loading
+    stop_event = threading.Event()
+    def tui_reader():
+        from origin.infrastructure.database import ArtifactRepository
+        db_path = os.path.join(mcp_workspace, ".origin", "workspace.db")
+        repo = ArtifactRepository(db_path)
+        while not stop_event.is_set():
+            try:
+                repo.list_decisions()
+                repo.list_memory()
+                repo.list_timeline()
+                # Read config and YAMLs
+                config_path = os.path.join(mcp_workspace, ".origin", "config.yaml")
+                if os.path.exists(config_path):
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        f.read()
+                dec_dir = os.path.join(mcp_workspace, ".origin", "decisions")
+                if os.path.exists(dec_dir):
+                    for name in os.listdir(dec_dir):
+                        with open(os.path.join(dec_dir, name), "r", encoding="utf-8") as f:
+                            f.read()
+            except Exception:
+                pass
+            time.sleep(0.05)  # Fast poll
+
+    thread = threading.Thread(target=tui_reader, daemon=True)
+    thread.start()
+
+    # Launch MCP server
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "origin.presentation.mcp_server"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    try:
+        # 1. Initialize
+        init_req = {
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test-client", "version": "1.0.0"}
+            },
+            "id": 1
+        }
+        proc.stdin.write(json.dumps(init_req) + "\n")
+        proc.stdin.flush()
+        proc.stdout.readline()  # consume init response
+
+        # 2. Call origin_add_decision (proposed)
+        add_req = {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "name": "origin_add_decision",
+                "arguments": {
+                    "title": "Use Redis Cache",
+                    "rationale": "In-memory cache layer",
+                    "status": "proposed",
+                    "confidence": 0.8,
+                    "alternatives": ["Memcached"],
+                    "affected_files": ["src/cache.py"]
+                }
+            },
+            "id": 2
+        }
+        proc.stdin.write(json.dumps(add_req) + "\n")
+        proc.stdin.flush()
+
+        resp_line = proc.stdout.readline().strip()
+        assert resp_line, "MCP server hung or exited on add decision call"
+        resp = json.loads(resp_line)
+        assert resp.get("id") == 2
+        assert "error" not in resp, f"Tool call returned error: {resp}"
+        
+        # Extract decision ID from the success text
+        result_text = resp["result"]["content"][0]["text"]
+        dec_id = result_text.split("Decision ")[1].split(" ")[0].strip().rstrip(":")
+
+        # 3. Call origin_reject_decision
+        reject_req = {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "name": "origin_reject_decision",
+                "arguments": {
+                    "id": dec_id
+                }
+            },
+            "id": 3
+        }
+        proc.stdin.write(json.dumps(reject_req) + "\n")
+        proc.stdin.flush()
+
+        resp_line2 = proc.stdout.readline().strip()
+        assert resp_line2, "MCP server hung or exited on reject decision call"
+        resp2 = json.loads(resp_line2)
+        assert resp2.get("id") == 3
+        assert "error" not in resp2, f"Tool call returned error: {resp2}"
+        assert "Successfully rejected" in resp2["result"]["content"][0]["text"]
+
+    finally:
+        stop_event.set()
+        thread.join(timeout=2)
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
+

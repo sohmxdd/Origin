@@ -39,10 +39,11 @@ class GitHelper:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=5.0,
             )
             sha = result.stdout.strip()
             return sha if len(sha) == 40 else None
-        except (subprocess.SubprocessError, FileNotFoundError):
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
             return None
 
     def get_current_branch(self) -> Optional[str]:
@@ -62,10 +63,11 @@ class GitHelper:
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=5.0,
             )
             branch = result.stdout.strip()
             return branch if branch and branch != "HEAD" else None
-        except (subprocess.SubprocessError, FileNotFoundError):
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
             return None
 
     def install_hooks(self) -> bool:
@@ -122,6 +124,7 @@ origin export --target claude-code || true
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=5.0,
             )
             commits = []
             raw_log = result.stdout.strip()
