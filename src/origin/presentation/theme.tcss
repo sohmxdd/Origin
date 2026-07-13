@@ -1,8 +1,8 @@
-/* Origin TUI — Event Horizon Theme */
-/* Near-black background, deep violet accents, minimal decoration */
+/* Origin TUI — 8-bit Black Hole Theme */
+/* Pure black background, glowing cyan/teal accents, zero default-color leakage */
 
 Screen {
-    background: #0a0a0f;
+    background: #000000;
 }
 
 /* ── Header ────────────────────────────────────────────── */
@@ -10,28 +10,28 @@ Screen {
 #header-bar {
     dock: top;
     height: 3;
-    background: #12121a;
-    color: #7f5af0;
+    background: #050505;
+    color: #00ffd2;
     text-style: bold;
     padding: 0 2;
-    border-bottom: solid #1a1a2e;
+    border-bottom: solid #0a4a42;
 }
 
 #header-bar .label {
-    color: #6e6a86;
+    color: #4d4d4d;
 }
 
 #singularity {
-    color: #7f5af0;
+    color: #00ffd2;
     text-style: bold;
 }
 
 #health-ok {
-    color: #2cb67d;
+    color: #00ffd2;
 }
 
 #health-warn {
-    color: #e2b055;
+    color: #e2a855;
 }
 
 #health-error {
@@ -41,68 +41,78 @@ Screen {
 /* ── Panels ────────────────────────────────────────────── */
 
 .panel {
-    background: #12121a;
-    border: heavy #1a1a2e;
+    background: #050505;
+    border: heavy #0a4a42;
     padding: 0 1;
 }
 
 .panel-title {
-    color: #6e6a86;
+    color: #00ffd2;
     text-style: bold;
 }
 
 /* Focus: pulsing border via class toggle */
 
 .pulse-a:focus-within {
-    border: heavy #7f5af0;
+    border: heavy #00ffd2;
 }
 
 .pulse-b:focus-within {
-    border: heavy #3b2875;
+    border: heavy #0a4a42;
 }
 
 /* Fallback focus without pulse class */
 
 .panel:focus-within {
-    border: heavy #7f5af0;
+    border: heavy #00ffd2;
 }
 
 /* ── Decisions List ────────────────────────────────────── */
 
-#decisions-panel {
-    width: 60%;
+#decisions-panel-wide, #decisions-panel-narrow {
+    background: #050505;
 }
 
-#decisions-list {
-    background: #12121a;
-    scrollbar-background: #12121a;
-    scrollbar-color: #1a1a2e;
-    scrollbar-color-active: #7f5af0;
-    scrollbar-color-hover: #3b2875;
+#decisions-list-wide, #decisions-list-narrow {
+    background: #050505;
+    scrollbar-background: #000000;
+    scrollbar-color: #0a4a42;
+    scrollbar-color-active: #00ffd2;
+    scrollbar-color-hover: #00ffd2;
 }
 
 .decision-row {
     height: 2;
     padding: 0 1;
-    color: #c5c0d8;
+    color: #4d4d4d;
 }
 
 .decision-row:hover {
-    background: #1a1a2e;
+    background: #050505;
 }
 
-.decision-row.--highlight {
-    background: #1e1e30;
+/* Override default Textual ListView highlight */
+
+ListView > ListItem.--highlight {
+    background: #0a4a42;
+    color: #00ffd2;
+    text-style: bold;
+}
+
+ListView:focus > ListItem.--highlight {
+    background: #0a4a42;
+    color: #00ffd2;
+    text-style: bold;
 }
 
 /* Status glyphs */
 
 .status-active {
-    color: #7f5af0;
+    color: #00ffd2;
 }
 
 .status-proposed {
-    color: #6e6a86;
+    color: #0a4a42;
 }
 
 .status-rejected {
@@ -110,45 +120,67 @@ Screen {
 }
 
 .status-superseded {
-    color: #6e6a86;
+    color: #4d4d4d;
 }
 
 /* ── Right panels ──────────────────────────────────────── */
 
-#right-column {
+#right-column-wide {
     width: 40%;
 }
 
-#memory-panel {
-    height: 50%;
+#memory-panel-wide, #memory-panel-narrow {
+    background: #050505;
 }
 
-#timeline-panel {
-    height: 50%;
+#timeline-panel-wide, #timeline-panel-narrow {
+    background: #050505;
 }
 
 .memory-category {
-    color: #7f5af0;
+    color: #00ffd2;
     text-style: bold;
 }
 
 .memory-entry {
-    color: #c5c0d8;
+    color: #4d4d4d;
     padding-left: 2;
 }
 
 .timeline-event {
-    color: #c5c0d8;
+    color: #4d4d4d;
     height: 2;
     padding: 0 1;
 }
 
-.timeline-event:hover {
-    background: #1a1a2e;
+.dim-text {
+    color: #4d4d4d;
 }
 
-.dim-text {
-    color: #6e6a86;
+/* ── Collapsible override ──────────────────────────────── */
+
+Collapsible {
+    background: #050505;
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+Collapsible > CollapsibleTitle {
+    background: #050505;
+    color: #00ffd2;
+    text-style: bold;
+    border: none;
+}
+
+Collapsible > CollapsibleTitle:hover {
+    background: #0a4a42;
+    color: #00ffd2;
+}
+
+Collapsible > CollapsibleTitle:focus {
+    background: #0a4a42;
+    color: #00ffd2;
 }
 
 /* ── Detail Modal ──────────────────────────────────────── */
@@ -157,38 +189,80 @@ Screen {
     align: center middle;
     width: 70%;
     height: 70%;
-    background: #12121a;
-    border: heavy #7f5af0;
+    background: #050505;
+    border: heavy #00ffd2;
     padding: 1 2;
 }
 
 #detail-modal .title {
-    color: #7f5af0;
+    color: #00ffd2;
     text-style: bold;
 }
 
 #detail-modal .label {
-    color: #6e6a86;
+    color: #0a4a42;
     text-style: bold;
 }
 
 #detail-modal .value {
-    color: #c5c0d8;
+    color: #4d4d4d;
 }
 
 /* ── Search Input ──────────────────────────────────────── */
 
-#search-input {
+#search-input-wide, #search-input-narrow {
     dock: top;
     height: 3;
-    background: #1a1a2e;
-    border: heavy #7f5af0;
-    color: #c5c0d8;
+    background: #050505;
+    border: tall #0a4a42;
+    color: #00ffd2;
     display: none;
 }
 
-#search-input.visible {
+#search-input-wide.visible, #search-input-narrow.visible {
     display: block;
+}
+
+Input {
+    background: #050505;
+    border: tall #0a4a42;
+    color: #00ffd2;
+}
+
+Input:focus {
+    border: tall #00ffd2;
+}
+
+/* ── TabbedContent override ────────────────────────────── */
+
+TabbedContent {
+    background: #000000;
+}
+
+TabPane {
+    background: #050505;
+    padding: 0;
+}
+
+Tabs {
+    background: #000000;
+    border-bottom: solid #0a4a42;
+}
+
+Tab {
+    background: #000000;
+    color: #4d4d4d;
+}
+
+Tab:hover {
+    background: #0a4a42;
+    color: #00ffd2;
+}
+
+Tab.--active {
+    background: #050505;
+    color: #00ffd2;
+    text-style: bold;
 }
 
 /* ── Status Message Bar ────────────────────────────────── */
@@ -196,28 +270,43 @@ Screen {
 #status-message {
     dock: bottom;
     height: 1;
-    background: #12121a;
-    color: #e2b055;
+    background: #000000;
+    color: #e2a855;
     padding: 0 2;
 }
 
 /* ── Footer ────────────────────────────────────────────── */
 
 Footer {
-    background: #12121a;
-    color: #6e6a86;
+    background: #050505;
+    color: #4d4d4d;
 }
 
 Footer > .footer--highlight {
-    background: #7f5af0;
-    color: #0a0a0f;
+    background: #00ffd2;
+    color: #000000;
 }
 
 Footer > .footer--key {
-    background: #3b2875;
-    color: #c5c0d8;
+    background: #0a4a42;
+    color: #00ffd2;
 }
 
 Footer > .footer--description {
-    color: #6e6a86;
+    color: #4d4d4d;
+}
+
+/* ── Splash Screen ─────────────────────────────────────── */
+
+#splash-screen {
+    background: #000000;
+    align: center middle;
+}
+
+#splash-art {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+    content-align: center middle;
+    background: #000000;
 }

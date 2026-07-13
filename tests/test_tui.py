@@ -6,77 +6,50 @@ non-proposed feedback, and search filtering.
 
 import os
 import pytest
-from textual.widgets import ListView, Static
+from textual.widgets import ListView, Static, TabbedContent
 
 from origin.application.use_cases import add_decision, set_memory, init_workspace
 from origin.config import get_origin_dir
 from origin.presentation.tui import OriginTUI
 
 
-@pytest.fixture
-def tui_workspace(tmp_path):
-    """Create an initialized Origin workspace with test data."""
-    workspace_root = str(tmp_path)
-    init_workspace(workspace_root, "TuiTestApp", with_hooks=False)
 
-    # Seed a proposed decision
-    add_decision(
-        workspace_root=workspace_root,
-        title="Use Redis for caching",
-        rationale="Fast in-memory key-value store.",
-        alternatives_considered=["Memcached"],
-        affected_files=["src/cache.py"],
-        confidence=0.8,
-        originating_agent="agent",
-        status="proposed",
-    )
-
-    # Seed an active decision
-    add_decision(
-        workspace_root=workspace_root,
-        title="Use PostgreSQL",
-        rationale="Relational DB for core data.",
-        alternatives_considered=["MySQL"],
-        affected_files=["src/db.py"],
-        confidence=0.95,
-        originating_agent="human",
-        status="active",
-    )
-
-    # Seed a memory entry
-    set_memory(workspace_root, "tech_stack", "framework", "fastapi", "human")
-
-    return workspace_root
 
 
 @pytest.mark.asyncio
 async def test_tui_boots_and_populates(tui_workspace):
     """Verify TUI loads workspace and populates decisions, memory, and timeline widgets."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
         # Check header contains workspace name
         header = app.query_one("#header-bar", Static)
         assert "TuiTestApp" in str(header.content)
 
         # Check decisions list is populated
-        list_view = app.query_one("#decisions-list", ListView)
+        list_view = app.query_one("#decisions-list-wide", ListView)
         assert len(list_view.children) >= 2  # At least our 2 seeded decisions
 
         # Check memory content is populated
-        memory_content = app.query_one("#memory-content")
+        memory_content = app.query_one("#memory-content-wide")
         assert len(memory_content.children) > 0
 
         # Check timeline content is populated
-        timeline_content = app.query_one("#timeline-content")
+        timeline_content = app.query_one("#timeline-content-wide")
         assert len(timeline_content.children) > 0
 
 
 @pytest.mark.asyncio
 async def test_tui_navigation(tui_workspace):
     """Verify arrow key and j/k navigation in the decisions list."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
-        list_view = app.query_one("#decisions-list", ListView)
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
+        list_view = app.query_one("#decisions-list-wide", ListView)
         list_view.focus()
         await pilot.pause()
 
@@ -95,16 +68,19 @@ async def test_tui_navigation(tui_workspace):
 @pytest.mark.asyncio
 async def test_tui_accept_proposed_decision(tui_workspace):
     """Verify pressing 'a' on a proposed decision accepts it."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
-        list_view = app.query_one("#decisions-list", ListView)
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
+        list_view = app.query_one("#decisions-list-wide", ListView)
         list_view.focus()
         await pilot.pause()
 
         # Find the proposed decision in the list
         proposed_index = None
         for i, item in enumerate(list_view.children):
-            if hasattr(item, "data") and item.data.status == "proposed":
+            if hasattr(item, "data") and item.data and item.data.status == "proposed":
                 proposed_index = i
                 break
 
@@ -127,8 +103,11 @@ async def test_tui_accept_proposed_decision(tui_workspace):
 @pytest.mark.asyncio
 async def test_tui_reject_proposed_decision(tui_workspace):
     """Verify pressing 'r' on a proposed decision rejects it."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
         # First, add another proposed decision so we have one to reject
         add_decision(
             workspace_root=tui_workspace,
@@ -146,14 +125,14 @@ async def test_tui_reject_proposed_decision(tui_workspace):
         app._render_all()
         await pilot.pause()
 
-        list_view = app.query_one("#decisions-list", ListView)
+        list_view = app.query_one("#decisions-list-wide", ListView)
         list_view.focus()
         await pilot.pause()
 
         # Find the proposed decision
         proposed_index = None
         for i, item in enumerate(list_view.children):
-            if hasattr(item, "data") and item.data.status == "proposed":
+            if hasattr(item, "data") and item.data and item.data.status == "proposed":
                 proposed_index = i
                 break
 
@@ -175,16 +154,19 @@ async def test_tui_reject_proposed_decision(tui_workspace):
 @pytest.mark.asyncio
 async def test_tui_non_proposed_feedback(tui_workspace):
     """Verify pressing 'a' on an active decision shows an inline message."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
-        list_view = app.query_one("#decisions-list", ListView)
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
+        list_view = app.query_one("#decisions-list-wide", ListView)
         list_view.focus()
         await pilot.pause()
 
         # Find the active decision
         active_index = None
         for i, item in enumerate(list_view.children):
-            if hasattr(item, "data") and item.data.status == "active":
+            if hasattr(item, "data") and item.data and item.data.status == "active":
                 active_index = i
                 break
 
@@ -206,8 +188,11 @@ async def test_tui_non_proposed_feedback(tui_workspace):
 @pytest.mark.asyncio
 async def test_tui_search_filtering(tui_workspace):
     """Verify '/' opens search and filters the decisions list."""
-    app = OriginTUI(workspace_root=tui_workspace)
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
     async with app.run_test() as pilot:
+        await pilot.resize_terminal(120, 40)
+        await pilot.pause()
+
         # Press '/' to open search
         await pilot.press("slash")
         await pilot.pause()
@@ -218,8 +203,26 @@ async def test_tui_search_filtering(tui_workspace):
         await pilot.pause()
 
         # Check that the decisions list was filtered
-        list_view = app.query_one("#decisions-list", ListView)
+        list_view = app.query_one("#decisions-list-wide", ListView)
         # Should show only the Redis decision
         for item in list_view.children:
-            if hasattr(item, "data"):
+            if hasattr(item, "data") and item.data:
                 assert "redis" in item.data.title.lower() or "Redis" in item.data.title
+
+
+@pytest.mark.asyncio
+async def test_tui_narrow_layout(tui_workspace):
+    """Verify narrow layout is activated when terminal size is small."""
+    app = OriginTUI(workspace_root=tui_workspace, show_splash=False)
+    async with app.run_test() as pilot:
+        # Resize to narrow width
+        await pilot.resize_terminal(80, 24)
+        await pilot.pause()
+
+        # Assert wide is hidden, narrow is displayed
+        assert app.query_one("#wide-layout").display is False
+        assert app.query_one("#narrow-layout").display is True
+
+        # Assert TabbedContent is accessible
+        tabbed_content = app.query_one("#narrow-layout", TabbedContent)
+        assert tabbed_content is not None

@@ -14,16 +14,16 @@ from typing import Optional
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import ModalScreen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Footer,
-    Header,
     Input,
-    Label,
     ListItem,
     ListView,
     Static,
     Collapsible,
+    TabbedContent,
+    TabPane,
 )
 from textual.timer import Timer
 
@@ -43,17 +43,60 @@ STATUS_GLYPHS = {
 }
 
 STATUS_STYLES = {
-    "active": "bold #7f5af0",
-    "proposed": "#6e6a86",
+    "active": "bold #00ffd2",
+    "proposed": "#0a4a42",
     "rejected": "bold #e25555",
-    "superseded": "#6e6a86",
+    "superseded": "#4d4d4d",
 }
 
 SINGULARITY_FRAMES = ["◐", "◓", "◑", "◒"]
 
 
-# ── Detail Modal ───────────────────────────────────────────
+# ── Splash Screen Art ──────────────────────────────────────
+SPLASH_ART = """
+                     [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+                 [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+              [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▓▒▒░░  ░░▒▒▓▓█████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+            [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░          ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+          [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░              ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+        [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▒░     ░░▒▒▓▓██▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
+       [#0a4a42]░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▒░     ░▒▓████████▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
+      [#0a4a42]░▒[/#0a4a42][#00ffd2]▓▓██████▒░      ░▒▓███    ███▓▒░     ▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒[/#0a4a42]
+      [#0a4a42]▒[/#0a4a42][#00ffd2]▓███████▓░       ▒▓██        ██▓▒      ▓████████▓[/#00ffd2][#0a4a42]▒[/#0a4a42]
+  [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████████        ████████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+  [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████████        ████████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+      [#0a4a42]▒[/#0a4a42][#00ffd2]▓███████▓░       ▒▓██        ██▓▒      ▓████████▓[/#00ffd2][#0a4a42]▒[/#0a4a42]
+      [#0a4a42]░▒[/#0a4a42][#00ffd2]▓▓██████▒░      ░▒▓███    ███▓▒░     ▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒[/#0a4a42]
+       [#0a4a42]░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▒░     ░▒▓████████▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
+        [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▒░     ░░▒▒▓▓██▓▒░    ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░[/#0a4a42]
+          [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░              ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+            [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████▓▓▒▒░          ░▒▓██████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+              [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓█████▓▓▒▒░░  ░░▒▒▓▓█████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+                 [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
+                     [#0a4a42]░░▒▒[/#0a4a42][#00ffd2]▓▓████████▓▓[/#00ffd2][#0a4a42]▒▒░░[/#0a4a42]
 
+                               [bold #00ffd2]O R I G I N[/]
+"""
+
+
+# ── Splash Screen ──────────────────────────────────────────
+class SplashScreen(Screen):
+    """Full-screen splash screen showing the 8-bit black hole."""
+
+    def compose(self) -> ComposeResult:
+        yield Static(SPLASH_ART, id="splash-art")
+
+    def on_mount(self) -> None:
+        self.set_timer(1.5, self.action_dismiss_splash)
+
+    def on_key(self, event) -> None:
+        self.action_dismiss_splash()
+
+    def action_dismiss_splash(self) -> None:
+        self.app.pop_screen()
+
+
+# ── Detail Modal ───────────────────────────────────────────
 class DecisionDetailModal(ModalScreen[None]):
     """Modal showing full decision details."""
 
@@ -73,26 +116,25 @@ class DecisionDetailModal(ModalScreen[None]):
         superseded = f"\n  Superseded by: {dec.superseded_by}" if dec.superseded_by else ""
 
         content = (
-            f"[bold #7f5af0]{glyph} {dec.title}[/]\n\n"
-            f"[bold #6e6a86]ID:[/] {dec.id}\n"
-            f"[bold #6e6a86]Status:[/] {dec.status}\n"
-            f"[bold #6e6a86]Confidence:[/] {dec.confidence:.2f}\n"
-            f"[bold #6e6a86]Agent:[/] {dec.originating_agent}\n"
-            f"[bold #6e6a86]Created:[/] {dec.created_at.strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"[bold #6e6a86]Updated:[/] {dec.updated_at.strftime('%Y-%m-%d %H:%M UTC')}"
+            f"[bold #00ffd2]{glyph} {dec.title}[/]\n\n"
+            f"[bold #0a4a42]ID:[/] {dec.id}\n"
+            f"[bold #0a4a42]Status:[/] {dec.status}\n"
+            f"[bold #0a4a42]Confidence:[/] {dec.confidence:.2f}\n"
+            f"[bold #0a4a42]Agent:[/] {dec.originating_agent}\n"
+            f"[bold #0a4a42]Created:[/] {dec.created_at.strftime('%Y-%m-%d %H:%M UTC')}\n"
+            f"[bold #0a4a42]Updated:[/] {dec.updated_at.strftime('%Y-%m-%d %H:%M UTC')}"
             f"{superseded}\n\n"
-            f"[bold #7f5af0]Rationale[/]\n{dec.rationale}\n\n"
-            f"[bold #7f5af0]Alternatives Considered[/]\n{alts}\n\n"
-            f"[bold #7f5af0]Affected Files[/]\n{files}"
+            f"[bold #00ffd2]Rationale[/]\n{dec.rationale}\n\n"
+            f"[bold #00ffd2]Alternatives Considered[/]\n{alts}\n\n"
+            f"[bold #00ffd2]Affected Files[/]\n{files}"
         )
 
         with Vertical(id="detail-modal"):
             yield Static(content, markup=True)
-            yield Static("\n[dim]Press ESC to close[/]", markup=True)
+            yield Static("\n[dim #4d4d4d]Press ESC to close[/]", markup=True)
 
 
 # ── Doctor Detail Modal ────────────────────────────────────
-
 class DoctorDetailModal(ModalScreen[None]):
     """Modal showing full doctor diagnostics."""
 
@@ -108,11 +150,10 @@ class DoctorDetailModal(ModalScreen[None]):
         lines = self._run_doctor()
         content = "\n".join(lines)
         with Vertical(id="detail-modal"):
-            yield Static(f"[bold #7f5af0]Origin Doctor Diagnostics[/]\n\n{content}", markup=True)
-            yield Static("\n[dim]Press ESC to close[/]", markup=True)
+            yield Static(f"[bold #00ffd2]Origin Doctor Diagnostics[/]\n\n{content}", markup=True)
+            yield Static("\n[dim #4d4d4d]Press ESC to close[/]", markup=True)
 
     def _run_doctor(self) -> list[str]:
-        """Run doctor checks and return formatted lines."""
         results: list[str] = []
         root = self.workspace_root
         origin_dir = os.path.join(root, ".origin")
@@ -127,7 +168,7 @@ class DoctorDetailModal(ModalScreen[None]):
                 if config.schema_version != "2.0":
                     results.append(f"[#e25555][FAIL][/] schema_version mismatch: expected '2.0', found '{config.schema_version}'.")
                 else:
-                    results.append(f"[#2cb67d][OK][/] config.yaml valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').")
+                    results.append(f"[#00ffd2][OK][/] config.yaml valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').")
             except Exception as e:
                 results.append(f"[#e25555][FAIL][/] config.yaml failed: {e}")
 
@@ -139,27 +180,26 @@ class DoctorDetailModal(ModalScreen[None]):
             try:
                 repo = ArtifactRepository(db_path)
                 repo.list_decisions()
-                results.append("[#2cb67d][OK][/] workspace.db schema is readable.")
+                results.append("[#00ffd2][OK][/] workspace.db schema is readable.")
                 # File staleness
                 decisions = repo.list_decisions(status="active")
                 for dec in decisions:
                     for f in dec.affected_files:
                         if not os.path.exists(os.path.join(root, f)):
-                            results.append(f"[#e2b055][WARN][/] Stale file: '{f}' (Decision '{dec.id[:16]}…')")
+                            results.append(f"[#e2a855][WARN][/] Stale file: '{f}' (Decision '{dec.id[:16]}…')")
             except Exception as e:
                 results.append(f"[#e25555][FAIL][/] database check failed: {e}")
 
         # Git check
         if not os.path.isdir(os.path.join(root, ".git")):
-            results.append("[#e2b055][WARN][/] Not a git repository.")
+            results.append("[#e2a855][WARN][/] Not a git repository.")
         else:
-            results.append("[#2cb67d][OK][/] Git repository detected.")
+            results.append("[#00ffd2][OK][/] Git repository detected.")
 
         return results
 
 
 # ── Main App ───────────────────────────────────────────────
-
 class OriginTUI(App):
     """Origin interactive TUI dashboard."""
 
@@ -176,9 +216,10 @@ class OriginTUI(App):
         Binding("d", "doctor_detail", "Doctor"),
     ]
 
-    def __init__(self, workspace_root: Optional[str] = None) -> None:
+    def __init__(self, workspace_root: Optional[str] = None, show_splash: bool = True) -> None:
         super().__init__()
         self.workspace_root = workspace_root or os.getcwd()
+        self.show_splash = show_splash
         self._singularity_frame = 0
         self._pulse_phase = True  # True = pulse-a, False = pulse-b
         self._search_active = False
@@ -192,34 +233,74 @@ class OriginTUI(App):
         self._pulse_timer: Optional[Timer] = None
         self._status_clear_timer: Optional[Timer] = None
 
+    @property
+    def is_narrow(self) -> bool:
+        """Dynamically evaluate narrow display layout size threshold."""
+        return self.size.width < 100
+
     def compose(self) -> ComposeResult:
         yield Static("", id="header-bar")
-        with Horizontal():
-            with Vertical(id="decisions-panel", classes="panel pulse-a"):
-                yield Static("[bold #6e6a86]DECISIONS[/]", classes="panel-title", markup=True)
-                yield Input(placeholder="Search… (ESC to clear)", id="search-input")
-                yield ListView(id="decisions-list")
-            with Vertical(id="right-column"):
-                with VerticalScroll(id="memory-panel", classes="panel"):
-                    yield Static("[bold #6e6a86]MEMORY[/]", classes="panel-title", markup=True)
-                    yield Vertical(id="memory-content")
-                with VerticalScroll(id="timeline-panel", classes="panel"):
-                    yield Static("[bold #6e6a86]TIMELINE[/]", classes="panel-title", markup=True)
-                    yield Vertical(id="timeline-content")
+        
+        # Wide Layout
+        with Horizontal(id="wide-layout"):
+            with Vertical(id="decisions-panel-wide", classes="panel pulse-a"):
+                yield Static("[bold #00ffd2]DECISIONS[/]", classes="panel-title", markup=True)
+                yield Input(placeholder="Search… (ESC to clear)", id="search-input-wide")
+                yield ListView(id="decisions-list-wide")
+            with Vertical(id="right-column-wide"):
+                with VerticalScroll(id="memory-panel-wide", classes="panel"):
+                    yield Static("[bold #00ffd2]MEMORY[/]", classes="panel-title", markup=True)
+                    yield Vertical(id="memory-content-wide")
+                with VerticalScroll(id="timeline-panel-wide", classes="panel"):
+                    yield Static("[bold #00ffd2]TIMELINE[/]", classes="panel-title", markup=True)
+                    yield Vertical(id="timeline-content-wide")
+
+        # Narrow Layout
+        with TabbedContent(id="narrow-layout"):
+            with TabPane("Decisions", id="decisions-tab"):
+                with Vertical(id="decisions-panel-narrow", classes="panel"):
+                    yield Static("[bold #00ffd2]DECISIONS[/]", classes="panel-title", markup=True)
+                    yield Input(placeholder="Search… (ESC to clear)", id="search-input-narrow")
+                    yield ListView(id="decisions-list-narrow")
+            with TabPane("Memory", id="memory-tab"):
+                with VerticalScroll(id="memory-panel-narrow", classes="panel"):
+                    yield Static("[bold #00ffd2]MEMORY[/]", classes="panel-title", markup=True)
+                    yield Vertical(id="memory-content-narrow")
+            with TabPane("Timeline", id="timeline-tab"):
+                with VerticalScroll(id="timeline-panel-narrow", classes="panel"):
+                    yield Static("[bold #00ffd2]TIMELINE[/]", classes="panel-title", markup=True)
+                    yield Vertical(id="timeline-content-narrow")
+
         yield Static("", id="status-message")
         yield Footer()
 
     def on_mount(self) -> None:
         """Load initial data and start timers."""
+        if self.show_splash:
+            self.push_screen(SplashScreen())
+        
         self._load_all_data()
         self._render_all()
+        
+        # Initial check for resize/layout configuration
+        self._update_layout_visibility()
+
         # Data refresh every 2 seconds
         self._refresh_timer = self.set_interval(2.0, self._poll_for_changes)
         # Pulse toggle every 1 second
         self._pulse_timer = self.set_interval(1.0, self._toggle_pulse)
 
-    # ── Data loading ───────────────────────────────────────
+    def on_resize(self, event=None) -> None:
+        """Handle screen resize dynamically."""
+        self._update_layout_visibility()
 
+    def _update_layout_visibility(self) -> None:
+        """Toggle wide vs narrow layouts based on size."""
+        narrow = self.is_narrow
+        self.query_one("#wide-layout").display = not narrow
+        self.query_one("#narrow-layout").display = narrow
+
+    # ── Data loading ───────────────────────────────────────
     def _load_all_data(self) -> None:
         """Load decisions, memory, timeline from repository."""
         try:
@@ -227,10 +308,11 @@ class OriginTUI(App):
             db_path = os.path.join(origin_dir, "workspace.db")
             repo = ArtifactRepository(db_path)
 
-            # Load all decisions (all statuses)
+            # Load all decisions
             self._all_decisions = []
             for status in ["active", "proposed", "superseded", "rejected"]:
                 self._all_decisions.extend(repo.list_decisions(status=status))
+            
             # Sort newest first
             self._all_decisions.sort(key=lambda d: d.created_at, reverse=True)
 
@@ -254,7 +336,6 @@ class OriginTUI(App):
             self._timeline = []
 
     # ── Rendering ──────────────────────────────────────────
-
     def _render_all(self) -> None:
         """Re-render all panels."""
         self._render_header()
@@ -282,9 +363,9 @@ class OriginTUI(App):
 
         header.update(
             f"  [{health_style}]{health_glyph}[/]  "
-            f"[bold #7f5af0]{ws_name}[/]  "
-            f"[#6e6a86]⎇ {branch}[/]  "
-            f"[bold #7f5af0]{singularity}[/]"
+            f"[bold #00ffd2]{ws_name}[/]  "
+            f"[#0a4a42]⎇ {branch}[/]  "
+            f"[bold #00ffd2]{singularity}[/]"
         )
 
     def _compute_health(self) -> tuple[str, str]:
@@ -312,80 +393,86 @@ class OriginTUI(App):
         if errors > 0:
             return "●", "#e25555"
         elif warnings > 0:
-            return "●", "#e2b055"
+            return "●", "#e2a855"
         else:
-            return "●", "#2cb67d"
+            return "●", "#00ffd2"
 
     def _render_decisions(self) -> None:
-        """Render decisions list panel."""
-        list_view = self.query_one("#decisions-list", ListView)
-        list_view.clear()
+        """Render decisions list panel for both layouts."""
+        for suffix in ["wide", "narrow"]:
+            list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
+            list_view.clear()
 
-        # Build supersession map: superseded_id -> superseding_id
-        supersession_map: dict[str, str] = {}
-        for dec in self._decisions:
-            if dec.superseded_by:
-                supersession_map[dec.id] = dec.superseded_by
+            if not self._decisions:
+                item = ListItem(Static("[#0a4a42]No decisions recorded yet. Try: origin decision add[/]", markup=True))
+                item.data = None
+                list_view.append(item)
+                continue
 
-        for dec in self._decisions:
-            glyph = STATUS_GLYPHS.get(dec.status, "?")
-            style = STATUS_STYLES.get(dec.status, "")
-            short_id = dec.id[:20] + "…"
+            for dec in self._decisions:
+                glyph = STATUS_GLYPHS.get(dec.status, "?")
+                style = STATUS_STYLES.get(dec.status, "")
+                short_id = dec.id[:20] + "…"
+                
+                title = dec.title
+                if len(title) > 40:
+                    title = title[:37] + "..."
 
-            label_text = f"[{style}]{glyph}[/]  [{style}]{dec.title}[/]  [#6e6a86]{dec.confidence:.2f}  {short_id}[/]"
+                label_text = f"[{style}]{glyph}[/]  [{style}]{title}[/]  [#0a4a42]{dec.confidence:.2f}  {short_id}[/]"
 
-            # Add supersession indicator
-            if dec.superseded_by:
-                sup_short = dec.superseded_by[:16] + "…"
-                label_text += f"\n   [#6e6a86]└─ superseded by {sup_short}[/]"
+                # Add supersession indicator
+                if dec.superseded_by:
+                    sup_short = dec.superseded_by[:16] + "…"
+                    label_text += f"\n   [#0a4a42]└─ superseded by {sup_short}[/]"
 
-            item = ListItem(Static(label_text, markup=True))
-            item.data = dec  # Store decision reference
-            list_view.append(item)
+                item = ListItem(Static(label_text, markup=True))
+                item.data = dec  # Store decision reference
+                list_view.append(item)
 
     def _render_memory(self) -> None:
-        """Render memory panel with collapsible categories."""
-        content = self.query_one("#memory-content", Vertical)
-        content.remove_children()
+        """Render memory panel with collapsible categories for both layouts."""
+        for suffix in ["wide", "narrow"]:
+            content = self.query_one(f"#memory-content-{suffix}", Vertical)
+            content.remove_children()
 
-        # Group by category
-        groups: dict[str, list[MemoryEntry]] = defaultdict(list)
-        for mem in self._memories:
-            groups[mem.category].append(mem)
+            # Group by category
+            groups: dict[str, list[MemoryEntry]] = defaultdict(list)
+            for mem in self._memories:
+                groups[mem.category].append(mem)
 
-        if not groups:
-            content.mount(Static("[#6e6a86]No memory entries[/]", markup=True))
-            return
+            if not groups:
+                content.mount(Static("[#0a4a42]No memory entries recorded yet. Try: origin memory set <cat> <key> <val>[/]", markup=True))
+                continue
 
-        for category, entries in sorted(groups.items()):
-            items_text = "\n".join(
-                f"  [#c5c0d8]{e.key}[/] = [#7f5af0]{e.value}[/]" for e in entries
-            )
-            collapsible = Collapsible(
-                Static(items_text, markup=True),
-                title=f"  {category} ({len(entries)})",
-                collapsed=False,
-            )
-            content.mount(collapsible)
+            for category, entries in sorted(groups.items()):
+                items_text = "\n".join(
+                    f"  [#4d4d4d]{e.key}[/] = [#00ffd2]{e.value}[/]" for e in entries
+                )
+                collapsible = Collapsible(
+                    Static(items_text, markup=True),
+                    title=f"  {category} ({len(entries)})",
+                    collapsed=False,
+                )
+                content.mount(collapsible)
 
     def _render_timeline(self) -> None:
-        """Render timeline panel with recent events."""
-        content = self.query_one("#timeline-content", Vertical)
-        content.remove_children()
+        """Render timeline panel with recent events for both layouts."""
+        for suffix in ["wide", "narrow"]:
+            content = self.query_one(f"#timeline-content-{suffix}", Vertical)
+            content.remove_children()
 
-        if not self._timeline:
-            content.mount(Static("[#6e6a86]No timeline events[/]", markup=True))
-            return
+            if not self._timeline:
+                content.mount(Static("[#0a4a42]No timeline events recorded yet.[/]", markup=True))
+                continue
 
-        # Show last 20 events
-        for event in self._timeline[:20]:
-            time_str = event.created_at.strftime("%m-%d %H:%M")
-            event_icon = "📝" if "decision" in event.event_type else "🔧" if "memory" in event.event_type else "📦" if "commit" in event.event_type else "📋"
-            line = f"[#6e6a86]{time_str}[/]  {event_icon}  [#c5c0d8]{event.summary}[/]"
-            content.mount(Static(line, markup=True, classes="timeline-event"))
+            # Show last 20 events
+            for event in self._timeline[:20]:
+                time_str = event.created_at.strftime("%m-%d %H:%M")
+                event_icon = "📝" if "decision" in event.event_type else "🔧" if "memory" in event.event_type else "📦" if "commit" in event.event_type else "📋"
+                line = f"[#0a4a42]{time_str}[/]  {event_icon}  [#4d4d4d]{event.summary}[/]"
+                content.mount(Static(line, markup=True, classes="timeline-event"))
 
     # ── Polling ────────────────────────────────────────────
-
     def _poll_for_changes(self) -> None:
         """Check filesystem for changes and refresh if needed."""
         # Rotate singularity glyph
@@ -433,7 +520,6 @@ class OriginTUI(App):
         return changed
 
     # ── Pulse animation ────────────────────────────────────
-
     def _toggle_pulse(self) -> None:
         """Toggle pulse CSS class on the focused panel."""
         self._pulse_phase = not self._pulse_phase
@@ -447,11 +533,10 @@ class OriginTUI(App):
                 panel.add_class("pulse-b")
 
     # ── Status message ─────────────────────────────────────
-
     def _show_status(self, message: str, duration: float = 3.0) -> None:
         """Show a temporary status message in the status bar."""
         status = self.query_one("#status-message", Static)
-        status.update(f"[#e2b055]{message}[/]")
+        status.update(f"[#e2a855]{message}[/]")
         # Clear after duration
         if self._status_clear_timer:
             self._status_clear_timer.stop()
@@ -463,10 +548,10 @@ class OriginTUI(App):
         status.update("")
 
     # ── Keybinding actions ─────────────────────────────────
-
     def _get_selected_decision(self) -> Optional[Decision]:
-        """Get the currently highlighted decision from the list."""
-        list_view = self.query_one("#decisions-list", ListView)
+        """Get the currently highlighted decision from the active layout list."""
+        suffix = "narrow" if self.is_narrow else "wide"
+        list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
         if list_view.highlighted_child is not None:
             item = list_view.highlighted_child
             if hasattr(item, "data"):
@@ -474,13 +559,15 @@ class OriginTUI(App):
         return None
 
     def action_cursor_down(self) -> None:
-        """Move cursor down in decisions list."""
-        list_view = self.query_one("#decisions-list", ListView)
+        """Move cursor down in the active decisions list."""
+        suffix = "narrow" if self.is_narrow else "wide"
+        list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
         list_view.action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        """Move cursor up in decisions list."""
-        list_view = self.query_one("#decisions-list", ListView)
+        """Move cursor up in the active decisions list."""
+        suffix = "narrow" if self.is_narrow else "wide"
+        list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
         list_view.action_cursor_up()
 
     def action_view_detail(self) -> None:
@@ -531,7 +618,8 @@ class OriginTUI(App):
 
     def action_open_search(self) -> None:
         """Toggle search input visibility."""
-        search_input = self.query_one("#search-input", Input)
+        suffix = "narrow" if self.is_narrow else "wide"
+        search_input = self.query_one(f"#search-input-{suffix}", Input)
         if self._search_active:
             # Clear search
             self._search_active = False
@@ -549,7 +637,7 @@ class OriginTUI(App):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle search submission."""
-        if event.input.id == "search-input":
+        if event.input.id in ["search-input-wide", "search-input-narrow"]:
             self._search_query = event.value.strip()
             if self._search_query:
                 q = self._search_query.lower()
@@ -560,7 +648,8 @@ class OriginTUI(App):
                 self._render_decisions()
                 self._show_status(f"Found {len(self._decisions)} result(s) for '{self._search_query}'.")
                 # Refocus list
-                list_view = self.query_one("#decisions-list", ListView)
+                suffix = "narrow" if self.is_narrow else "wide"
+                list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
                 list_view.focus()
             else:
                 self._search_active = False
@@ -572,14 +661,16 @@ class OriginTUI(App):
         if event.key == "escape" and self._search_active:
             self._search_active = False
             self._search_query = ""
-            search_input = self.query_one("#search-input", Input)
-            search_input.add_class("hidden")
-            search_input.value = ""
+            for suffix in ["wide", "narrow"]:
+                search_input = self.query_one(f"#search-input-{suffix}", Input)
+                search_input.add_class("hidden")
+                search_input.value = ""
             self._decisions = list(self._all_decisions)
             self._render_decisions()
             self._show_status("Search cleared.")
             # Refocus list
-            list_view = self.query_one("#decisions-list", ListView)
+            suffix = "narrow" if self.is_narrow else "wide"
+            list_view = self.query_one(f"#decisions-list-{suffix}", ListView)
             list_view.focus()
             event.prevent_default()
 
