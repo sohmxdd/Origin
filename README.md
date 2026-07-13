@@ -170,4 +170,4 @@ We welcome contributions! Please review [CONTRIBUTING.md](CONTRIBUTING.md) to se
 
 If you find Origin helpful for pair programming with AI agents, please **star this repository** to help others discover it!
 
-*Built with ❤️ by the Advanced Agentic Coding Team.*
+
