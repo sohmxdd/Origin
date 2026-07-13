@@ -169,3 +169,49 @@ async def test_mcp_accept_reject(mcp_workspace: str) -> None:
     )
     assert "Successfully accepted" in accept_response[0][0].text
 
+
+def test_mcp_stdio_json_rpc(mcp_workspace):
+    """Verify that launching the MCP server on stdio transport responds only with valid JSON-RPC."""
+    import subprocess
+    import sys
+    import json
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "origin.presentation.mcp_server"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    req = {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"}
+        },
+        "id": 1
+    }
+
+    try:
+        proc.stdin.write(json.dumps(req) + "\n")
+        proc.stdin.flush()
+
+        # Read the first line of output
+        resp_line = proc.stdout.readline().strip()
+        assert resp_line, "MCP server exited without returning JSON-RPC"
+
+        # Verify it is valid JSON
+        resp_json = json.loads(resp_line)
+        assert resp_json.get("jsonrpc") == "2.0"
+        assert resp_json.get("id") == 1
+        assert "result" in resp_json
+
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+

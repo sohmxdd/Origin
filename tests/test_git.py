@@ -19,9 +19,12 @@ def test_git_helper_valid_git_dir(tmp_path: Any) -> None:
     repo_path = str(tmp_path)
     # Init a git repo in the temp path
     try:
-        subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
-    except (subprocess.SubprocessError, FileNotFoundError):
-        pytest.skip("git CLI is not available in this test environment")
+        subprocess.run(["git", "init"], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        try:
+            subprocess.run("git init", cwd=repo_path, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        except Exception:
+            pytest.skip("git CLI is not available in this test environment")
 
     helper = GitHelper(repo_path)
     # No commits yet, so SHA should be None
