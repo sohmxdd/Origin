@@ -51,7 +51,7 @@ HomeView {
 
 #welcome-art {
     width: 100%;
-    height: 9;
+    height: 6;
     content-align: center middle;
 }
 
