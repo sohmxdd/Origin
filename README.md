@@ -1,4 +1,4 @@
-# ✨ Origin
+# ⚛️ Origin
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
@@ -10,7 +10,7 @@
 
 ---
 
-## 🛠️ System Architecture
+## ⚙️ System Architecture
 
 Origin stores each artifact as an individual YAML file (git-mergeable, human-readable), backed by a rebuildable SQLite query cache. Three thin adapter layers — CLI, MCP server, and interactive TUI — all route through a shared application service layer. Markdown mirrors are committed to Git for agent consumption.
 
@@ -18,7 +18,7 @@ Origin stores each artifact as an individual YAML file (git-mergeable, human-rea
 graph TD
     subgraph Client ["Developer Environments & Agents"]
         CLI["origin CLI"]
-        TUI["origin tui (Interactive Dashboard)"]
+        TUI["origin (Interactive Dashboard)"]
         Agent["Any AI Agent (via MCP or file read)"]
     end
 
@@ -56,7 +56,7 @@ graph TD
 ## 🚀 Quickstart
 
 ### 1. Installation
-Install the package locally:
+Install the package globally or in your python environment:
 ```bash
 pip install -e .
 ```
@@ -95,7 +95,7 @@ This appends/updates a marked context block inside the target file without clobb
 
 ---
 
-## 🧬 Decision Supersession Chain
+## 🔗 Decision Supersession Chain
 
 When requirements evolve, you can supersede old decisions. Origin preserves the entire historical chain in your database, letting agents inspect *why* changes occurred.
 
@@ -121,37 +121,32 @@ origin decision supersede dec_01KXBTA5DD6... \
 
 ## 🖥️ Interactive TUI Dashboard
 
-Launch a real-time terminal dashboard with `origin tui`. It surfaces all decisions, memory, and timeline data in a keyboard-navigable three-panel layout.
+Launch a real-time, keyboard-navigable terminal dashboard with `origin`. It leverages a modern, input-driven Claude Code-style UI with a custom 8-bit Atom logo and persistent header.
 
 ```bash
-origin tui
+origin
 ```
 
-### Keybindings
+### Command Prompt & Navigation
 
-| Key | Action |
-| :--- | :--- |
-| `↑`/`↓` or `j`/`k` | Navigate the decisions list |
-| `Enter` | View full decision detail (rationale, alternatives, files) |
-| `a` | Accept a proposed decision |
-| `r` | Reject a proposed decision |
-| `/` | Search across decisions (ESC to clear) |
-| `d` | Show full doctor diagnostics |
-| `q` | Quit |
+At the bottom of the TUI is an interactive Command Input bar. You can type slash commands directly or enter keywords to query the workspace:
 
-### What you see
+| Tab / Command | Key Shortcut | Description |
+| :--- | :--- | :--- |
+| `1` / `/overview` | `1` | Home View with Welcome Screen and dynamic System Diagnostics |
+| `2` / `/decisions` | `2` | Interactive Decisions View with list groups and side inspector |
+| `3` / `/knowledge` | `3` | Collapsible Memory list grouped by category with side inspector |
+| `4` / `/timeline` | `4` | Chronological activity feed with static symbols overview guide |
+| `5` / `/context` | `5` | Live Markdown compilation of all workspace decisions and memory |
+| `/doctor` | - | Runs diagnostics and health check |
+| `/export <target>`| - | Exports context bundle (`claude-code`, `cursor`, `generic`) |
+| `/quit` / `/q` | - | Exits Origin |
 
-- **Left panel**: All decisions with status glyphs (`●` active, `◌` proposed, `✕` rejected, `↺` superseded)
-- **Top-right**: Memory entries grouped by category (collapsible)
-- **Bottom-right**: Activity timeline (newest first, auto-refreshing)
-- **Header**: Workspace name, git branch, health indicator, singularity rotation glyph
-
-The TUI auto-polls for changes every 2 seconds — if another agent session writes a decision via MCP while you're watching, it appears automatically.
-
-To try it with a pre-populated workspace:
-```bash
-python demo_tui.py
-```
+### Navigation Controls
+* **Tab Cycling**: Press `Tab` and `Shift+Tab` to move sequentially between views.
+* **List Navigation**: Press `UP` / `DOWN` (or `j` / `k`) to navigate decision or memory list items. The right sidebar inspector panel will instantly update with details for the selected item.
+* **Accept / Reject**: Press `a` to accept or `r` to reject a proposed decision while highlighting it in the Decisions list view.
+* **Command Palette**: Press `Ctrl+K` to open the quick-command overlay window.
 
 ---
 
@@ -184,12 +179,12 @@ This prints the JSON snippet (`origin-mcp` command + args) you can paste into an
 
 ---
 
-## 🛠️ Command-Line Interface Reference
+## 💻 Command-Line Interface Reference
 
 | Command | Description |
 | :--- | :--- |
 | `origin init` | Creates `.origin/` folder, YAML directories, and SQLite cache |
-| `origin tui` | Launch the interactive terminal dashboard |
+| `origin` | Launch the interactive terminal dashboard |
 | `origin decision add` | Record new architecture decision (interactive or flags) |
 | `origin decision add --propose` | Record as a proposed decision (pending human review) |
 | `origin decision accept <id>` | Accept and activate a proposed decision |
@@ -215,8 +210,6 @@ We welcome contributions! Please review [CONTRIBUTING.md](CONTRIBUTING.md) to se
 
 ---
 
-## ⭐ Star the Repo!
+## ❤️ Star the Repo!
 
 If you find Origin helpful for pair programming with AI agents, please **star this repository** to help others discover it!
-
-
