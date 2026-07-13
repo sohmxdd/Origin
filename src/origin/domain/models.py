@@ -21,6 +21,7 @@ class ArtifactBase(BaseModel):
     originating_agent: str = Field(description="e.g. 'claude-code', 'codex-cli', 'human'")
     status: Literal["active", "superseded", "deprecated", "proposed", "rejected"] = "active"
     superseded_by: str | None = None
+    warnings: list[str] = Field(default_factory=list, exclude=True)
 
 
 class Decision(ArtifactBase):
