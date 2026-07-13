@@ -82,7 +82,8 @@ def origin_add_decision(
             originating_agent="mcp-server",
             status=status,
         )
-        return f"Successfully recorded Decision {dec.id}: '{dec.title}' (Status: {dec.status}, Confidence: {dec.confidence:.2f})"
+        warning_str = f" (Warning: {', '.join(dec.warnings)})" if getattr(dec, "warnings", None) else ""
+        return f"Successfully recorded Decision {dec.id}: '{dec.title}' (Status: {dec.status}, Confidence: {dec.confidence:.2f}){warning_str}"
     except Exception as e:
         import traceback
         import sys
@@ -103,7 +104,8 @@ def origin_accept_decision(id: str) -> str:
     root = find_workspace_root()
     try:
         dec = use_cases.accept_decision(root, id, agent="mcp-server")
-        return f"Successfully accepted proposed Decision {dec.id}: '{dec.title}'"
+        warning_str = f" (Warning: {', '.join(dec.warnings)})" if getattr(dec, "warnings", None) else ""
+        return f"Successfully accepted proposed Decision {dec.id}: '{dec.title}'{warning_str}"
     except Exception as e:
         import traceback
         import sys
@@ -124,7 +126,8 @@ def origin_reject_decision(id: str) -> str:
     root = find_workspace_root()
     try:
         dec = use_cases.reject_decision(root, id, agent="mcp-server")
-        return f"Successfully rejected proposed Decision {dec.id}: '{dec.title}'"
+        warning_str = f" (Warning: {', '.join(dec.warnings)})" if getattr(dec, "warnings", None) else ""
+        return f"Successfully rejected proposed Decision {dec.id}: '{dec.title}'{warning_str}"
     except Exception as e:
         import traceback
         import sys
@@ -201,7 +204,8 @@ def origin_supersede_decision(
             confidence=conf,
             originating_agent="mcp-server",
         )
-        return f"Successfully superseded {id} with Decision {dec.id}: '{dec.title}'"
+        warning_str = f" (Warning: {', '.join(dec.warnings)})" if getattr(dec, "warnings", None) else ""
+        return f"Successfully superseded {id} with Decision {dec.id}: '{dec.title}'{warning_str}"
     except Exception as e:
         import traceback
         import sys
@@ -230,7 +234,8 @@ def origin_set_memory(category: str, key: str, value: str) -> str:
             value=value,
             originating_agent="mcp-server",
         )
-        return f"Saved Memory Entry [{entry.id}]: {category}.{key} = '{value}'"
+        warning_str = f" (Warning: {', '.join(entry.warnings)})" if getattr(entry, "warnings", None) else ""
+        return f"Saved Memory Entry [{entry.id}]: {category}.{key} = '{value}'{warning_str}"
     except Exception as e:
         import traceback
         import sys

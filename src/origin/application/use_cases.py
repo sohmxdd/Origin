@@ -132,6 +132,7 @@ def add_decision(
         import sys
         traceback.print_exc(file=sys.stderr)
         print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        decision.warnings.append(f"Post-write sync skipped: {e}")
 
     return decision
 
@@ -210,6 +211,7 @@ def supersede_decision(
         import sys
         traceback.print_exc(file=sys.stderr)
         print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        new_decision.warnings.append(f"Post-write sync skipped: {e}")
 
     return new_decision
 
@@ -279,6 +281,7 @@ def set_memory(
         import sys
         traceback.print_exc(file=sys.stderr)
         print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        entry.warnings.append(f"Post-write sync skipped: {e}")
 
     return entry
 
@@ -364,6 +367,7 @@ def accept_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
         import sys
         traceback.print_exc(file=sys.stderr)
         print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        decision.warnings.append(f"Post-write sync skipped: {e}")
     return decision
 
 
@@ -404,6 +408,7 @@ def reject_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
         import sys
         traceback.print_exc(file=sys.stderr)
         print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        decision.warnings.append(f"Post-write sync skipped: {e}")
     return decision
 
 
