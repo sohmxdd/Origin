@@ -51,6 +51,7 @@ def origin_add_decision(
     alternatives: List[str] = [],
     affected_files: List[str] = [],
     confidence: float = 1.0,
+    status: str = "active",
 ) -> str:
     """Record a new architectural or project decision.
 
@@ -60,6 +61,7 @@ def origin_add_decision(
         alternatives: Alternative solutions evaluated.
         affected_files: Files or components affected by this decision.
         confidence: Agent's confidence score (0.0 to 1.0).
+        status: The initial status of the decision (either 'active' or 'proposed').
 
     Returns:
         A success message with the new decision ID.
@@ -75,10 +77,47 @@ def origin_add_decision(
             affected_files=affected_files,
             confidence=conf,
             originating_agent="mcp-server",
+            status=status,
         )
-        return f"Successfully recorded Decision {dec.id}: '{dec.title}' (Confidence: {dec.confidence:.2f})"
+        return f"Successfully recorded Decision {dec.id}: '{dec.title}' (Status: {dec.status}, Confidence: {dec.confidence:.2f})"
     except OriginError as e:
         return f"Error adding decision: {e}"
+
+
+@mcp.tool()
+def origin_accept_decision(id: str) -> str:
+    """Accept and activate a proposed decision.
+
+    Args:
+        id: The ID of the proposed decision to accept.
+
+    Returns:
+        A success message.
+    """
+    root = find_workspace_root()
+    try:
+        dec = use_cases.accept_decision(root, id, agent="mcp-server")
+        return f"Successfully accepted proposed Decision {dec.id}: '{dec.title}'"
+    except OriginError as e:
+        return f"Error accepting decision: {e}"
+
+
+@mcp.tool()
+def origin_reject_decision(id: str) -> str:
+    """Reject a proposed decision.
+
+    Args:
+        id: The ID of the proposed decision to reject.
+
+    Returns:
+        A success message.
+    """
+    root = find_workspace_root()
+    try:
+        dec = use_cases.reject_decision(root, id, agent="mcp-server")
+        return f"Successfully rejected proposed Decision {dec.id}: '{dec.title}'"
+    except OriginError as e:
+        return f"Error rejecting decision: {e}"
 
 
 @mcp.tool()

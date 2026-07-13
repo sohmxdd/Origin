@@ -127,3 +127,45 @@ async def test_mcp_search(mcp_workspace: str) -> None:
     )
     content_blocks = search_response[0]
     assert "Memory: tech_stack.framework = 'fastapi'" in content_blocks[0].text
+
+
+@pytest.mark.asyncio
+async def test_mcp_accept_reject(mcp_workspace: str) -> None:
+    """Verify origin_accept_decision and origin_reject_decision via MCP."""
+    # 1. Propose decision
+    add_response = await mcp.call_tool(
+        "origin_add_decision",
+        arguments={
+            "title": "Use Redis",
+            "rationale": "For caching",
+            "status": "proposed",
+        },
+    )
+    content_blocks = add_response[0]
+    dec_id = content_blocks[0].text.split("Decision ")[1].split(":")[0].strip()
+
+    # 2. Reject decision
+    reject_response = await mcp.call_tool(
+        "origin_reject_decision",
+        arguments={"id": dec_id},
+    )
+    assert "Successfully rejected" in reject_response[0][0].text
+
+    # 3. Propose another
+    add_response2 = await mcp.call_tool(
+        "origin_add_decision",
+        arguments={
+            "title": "Use Memcached",
+            "rationale": "Alternative caching",
+            "status": "proposed",
+        },
+    )
+    dec_id2 = add_response2[0][0].text.split("Decision ")[1].split(":")[0].strip()
+
+    # 4. Accept decision
+    accept_response = await mcp.call_tool(
+        "origin_accept_decision",
+        arguments={"id": dec_id2},
+    )
+    assert "Successfully accepted" in accept_response[0][0].text
+
