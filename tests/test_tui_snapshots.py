@@ -1,7 +1,7 @@
-"""Visual regression tests for the Origin TUI using pytest-textual-snapshot.
+"""Visual regression tests for the Origin TUI v2 using pytest-textual-snapshot.
 
-Captures the boot splash screen, the empty dashboard state, and
-a populated dashboard state with frozen timestamps and git branch.
+Captures all views in both empty and populated states, plus overlays.
+Uses FrozenOriginTUI to freeze times, IDs, and branch names for determinism.
 """
 
 import os
@@ -9,6 +9,8 @@ import shutil
 import re
 from datetime import datetime, timezone
 from unittest.mock import patch
+import pytest
+
 from origin.presentation.tui import OriginTUI
 from origin.application.use_cases import init_workspace, add_decision, set_memory
 
@@ -38,6 +40,8 @@ class FrozenOriginTUI(OriginTUI):
         
         for i, e in enumerate(self._memories):
             e.id = f"mem_test_id_{i}"
+            e.created_at = fixed_dt
+            e.updated_at = fixed_dt
             
         # Sort timeline deterministically by summary first
         self._timeline.sort(key=lambda e: e.summary)
@@ -69,44 +73,143 @@ def test_boot_screen_snapshot(snap_compare):
         assert snap_compare(app)
 
 
-def test_empty_dashboard_snapshot(snap_compare):
-    """Capture the dashboard layout in its empty state (no decisions/memory)."""
-    workspace_root = get_static_test_workspace("empty")
-    init_workspace(workspace_root, "EmptyTest", with_hooks=False)
+# ── Overview View Snapshots ────────────────────────────────
+def test_overview_empty_snapshot(snap_compare):
+    """Capture the Overview dashboard in its empty state."""
+    workspace_root = get_static_test_workspace("overview_empty")
+    init_workspace(workspace_root, "EmptyWS", with_hooks=False)
 
     with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
         app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
         assert snap_compare(app)
 
 
-def test_populated_dashboard_snapshot(snap_compare):
-    """Capture the dashboard layout with decisions, memory, and timeline events."""
-    workspace_root = get_static_test_workspace("populated")
-    init_workspace(workspace_root, "PopulatedTest", with_hooks=False)
-
-    # Seed test data manually so it has a static path
-    add_decision(
-        workspace_root=workspace_root,
-        title="Use Redis for caching",
-        rationale="Fast in-memory key-value store.",
-        alternatives_considered=["Memcached"],
-        affected_files=["src/cache.py"],
-        confidence=0.8,
-        originating_agent="agent",
-        status="proposed",
-    )
-    add_decision(
-        workspace_root=workspace_root,
-        title="Use PostgreSQL",
-        rationale="Relational DB for core data.",
-        alternatives_considered=["MySQL"],
-        affected_files=["src/db.py"],
-        confidence=0.95,
-        originating_agent="human",
-        status="active",
-    )
-    set_memory(workspace_root, "tech_stack", "framework", "fastapi", "human")
+def test_overview_populated_snapshot(snap_compare):
+    """Capture the Overview dashboard in its populated state."""
+    workspace_root = get_static_test_workspace("overview_populated")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "agent", "proposed")
+    set_memory(workspace_root, "tech_stack", "db", "postgres", "human")
 
     with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
         app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
         assert snap_compare(app)
+
+
+# ── Context View Snapshots ─────────────────────────────────
+def test_context_empty_snapshot(snap_compare):
+    """Capture the Context view in empty state."""
+    workspace_root = get_static_test_workspace("context_empty")
+    init_workspace(workspace_root, "EmptyWS", with_hooks=False)
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab",))
+
+
+def test_context_populated_snapshot(snap_compare):
+    """Capture the Context view in populated state."""
+    workspace_root = get_static_test_workspace("context_populated")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "agent", "active")
+    set_memory(workspace_root, "tech_stack", "db", "postgres", "human")
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab",))
+
+
+# ── Decisions View Snapshots ───────────────────────────────
+def test_decisions_empty_snapshot(snap_compare):
+    """Capture Decisions view in empty state."""
+    workspace_root = get_static_test_workspace("dec_empty")
+    init_workspace(workspace_root, "EmptyWS", with_hooks=False)
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab"))
+
+
+def test_decisions_populated_snapshot(snap_compare):
+    """Capture Decisions view in populated state."""
+    workspace_root = get_static_test_workspace("dec_populated")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    add_decision(workspace_root, "Redis caching", "Cache rationale", ["Memcached"], ["src/cache.py"], 0.8, "agent", "proposed")
+    add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "human", "active")
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab"))
+
+
+# ── Knowledge View Snapshots ───────────────────────────────
+def test_knowledge_empty_snapshot(snap_compare):
+    """Capture Knowledge view in empty state."""
+    workspace_root = get_static_test_workspace("know_empty")
+    init_workspace(workspace_root, "EmptyWS", with_hooks=False)
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab", "tab"))
+
+
+def test_knowledge_populated_snapshot(snap_compare):
+    """Capture Knowledge view in populated state."""
+    workspace_root = get_static_test_workspace("know_populated")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    set_memory(workspace_root, "tech_stack", "db", "postgres", "human")
+    set_memory(workspace_root, "convention", "linter", "ruff", "agent")
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab", "tab"))
+
+
+# ── Timeline View Snapshots ────────────────────────────────
+def test_timeline_empty_snapshot(snap_compare):
+    """Capture Timeline view in empty state."""
+    workspace_root = get_static_test_workspace("time_empty")
+    init_workspace(workspace_root, "EmptyWS", with_hooks=False)
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab", "tab", "tab"))
+
+
+def test_timeline_populated_snapshot(snap_compare):
+    """Capture Timeline view in populated state."""
+    workspace_root = get_static_test_workspace("time_populated")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "human", "active")
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("tab", "tab", "tab", "tab"))
+
+
+# ── Overlay Snapshots ──────────────────────────────────────
+def test_command_palette_overlay_snapshot(snap_compare):
+    """Capture the Command Palette overlay."""
+    workspace_root = get_static_test_workspace("palette")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("ctrl+k",))
+
+
+def test_search_overlay_snapshot(snap_compare):
+    """Capture the Search overlay with typed input."""
+    workspace_root = get_static_test_workspace("search")
+    init_workspace(workspace_root, "PopulatedWS", with_hooks=False)
+    
+    add_decision(workspace_root, "Database setup", "Postgres rationale", [], [], 0.9, "human", "active")
+
+    with patch("origin.presentation.tui.GitHelper.get_current_branch", return_value="main"):
+        app = FrozenOriginTUI(workspace_root=workspace_root, show_splash=False)
+        assert snap_compare(app, press=("slash", "D", "a", "t", "a"))

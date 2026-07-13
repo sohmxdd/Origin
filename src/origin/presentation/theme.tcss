@@ -1,4 +1,4 @@
-/* Origin TUI — 8-bit Black Hole Theme */
+/* Origin TUI — 8-bit Black Hole Theme v2 */
 /* Pure black background, glowing cyan/teal accents, zero default-color leakage */
 
 Screen {
@@ -6,7 +6,6 @@ Screen {
 }
 
 /* ── Header ────────────────────────────────────────────── */
-
 #header-bar {
     dock: top;
     height: 3;
@@ -17,42 +16,101 @@ Screen {
     border-bottom: solid #0a4a42;
 }
 
-#header-bar .label {
-    color: #4d4d4d;
+/* ── Content Switcher ──────────────────────────────────── */
+#main-switcher {
+    height: 1fr;
+    background: #000000;
 }
 
-#singularity {
-    color: #00ffd2;
-    text-style: bold;
+/* ── Overview View ────────────────────────────────────── */
+.overview-card {
+    background: #050505;
+    border: heavy #0a4a42;
+    padding: 1 2;
+    margin-bottom: 1;
 }
 
-#health-ok {
-    color: #00ffd2;
+#overview-metrics {
+    height: 5;
+    margin-bottom: 1;
 }
 
-#health-warn {
-    color: #e2a855;
+.metric-card {
+    background: #050505;
+    border: heavy #0a4a42;
+    margin-right: 2;
+    padding: 0 2;
+    width: 32%;
 }
 
-#health-error {
-    color: #e25555;
+.diagnostics-panel {
+    height: 9;
+    background: #050505;
+    border: heavy #0a4a42;
+    padding: 0 1;
+    margin-top: 1;
 }
 
-/* ── Panels ────────────────────────────────────────────── */
+#overview-timeline-feed {
+    padding: 1 2;
+}
 
+/* ── Context View ──────────────────────────────────────── */
+#context-markdown {
+    background: #050505;
+    border: heavy #0a4a42;
+    padding: 1 2;
+}
+
+/* ── List Views & Inspector Layout ─────────────────────── */
+.list-pane {
+    background: #050505;
+    padding: 0 1;
+}
+
+.inspector-pane {
+    background: #050505;
+    padding: 1 2;
+}
+
+/* Responsive Class Toggling rules */
+.wide .list-pane {
+    width: 60%;
+}
+
+.wide .inspector-pane {
+    width: 40%;
+    border-left: solid #0a4a42;
+}
+
+.narrow .inspector-pane {
+    display: none;
+}
+
+.narrow.show-inspector .inspector-pane {
+    display: block;
+    width: 100%;
+}
+
+.narrow.show-inspector .list-pane {
+    display: none;
+}
+
+/* ── UI Panels ─────────────────────────────────────────── */
 .panel {
     background: #050505;
     border: heavy #0a4a42;
     padding: 0 1;
+    margin-bottom: 1;
 }
 
 .panel-title {
     color: #00ffd2;
     text-style: bold;
+    margin-bottom: 1;
 }
 
-/* Focus: pulsing border via class toggle */
-
+/* Pulsing focus border classes */
 .pulse-a:focus-within {
     border: heavy #00ffd2;
 }
@@ -61,37 +119,18 @@ Screen {
     border: heavy #0a4a42;
 }
 
-/* Fallback focus without pulse class */
-
-.panel:focus-within {
+.list-pane:focus-within {
     border: heavy #00ffd2;
 }
 
-/* ── Decisions List ────────────────────────────────────── */
-
-#decisions-panel-wide, #decisions-panel-narrow {
-    background: #050505;
-}
-
-#decisions-list-wide, #decisions-list-narrow {
+/* ── ListView & Scrollbars ────────────────────────────── */
+ListView {
     background: #050505;
     scrollbar-background: #000000;
     scrollbar-color: #0a4a42;
     scrollbar-color-active: #00ffd2;
     scrollbar-color-hover: #00ffd2;
 }
-
-.decision-row {
-    height: 2;
-    padding: 0 1;
-    color: #4d4d4d;
-}
-
-.decision-row:hover {
-    background: #050505;
-}
-
-/* Override default Textual ListView highlight */
 
 ListView > ListItem.--highlight {
     background: #0a4a42;
@@ -105,168 +144,74 @@ ListView:focus > ListItem.--highlight {
     text-style: bold;
 }
 
-/* Status glyphs */
-
-.status-active {
-    color: #00ffd2;
-}
-
-.status-proposed {
+/* Day header inside timeline list */
+.day-header {
+    background: #050505;
     color: #0a4a42;
-}
-
-.status-rejected {
-    color: #e25555;
-}
-
-.status-superseded {
-    color: #4d4d4d;
-}
-
-/* ── Right panels ──────────────────────────────────────── */
-
-#right-column-wide {
-    width: 40%;
-}
-
-#memory-panel-wide, #memory-panel-narrow {
-    background: #050505;
-}
-
-#timeline-panel-wide, #timeline-panel-narrow {
-    background: #050505;
-}
-
-.memory-category {
-    color: #00ffd2;
     text-style: bold;
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
-.memory-entry {
-    color: #4d4d4d;
-    padding-left: 2;
-}
-
-.timeline-event {
-    color: #4d4d4d;
-    height: 2;
-    padding: 0 1;
-}
-
-.dim-text {
-    color: #4d4d4d;
-}
-
-/* ── Collapsible override ──────────────────────────────── */
-
-Collapsible {
-    background: #050505;
-    border: none;
-    margin: 0;
-    padding: 0;
-}
-
-Collapsible > CollapsibleTitle {
-    background: #050505;
-    color: #00ffd2;
-    text-style: bold;
-    border: none;
-}
-
-Collapsible > CollapsibleTitle:hover {
-    background: #0a4a42;
-    color: #00ffd2;
-}
-
-Collapsible > CollapsibleTitle:focus {
-    background: #0a4a42;
-    color: #00ffd2;
-}
-
-/* ── Detail Modal ──────────────────────────────────────── */
-
-#detail-modal {
+/* ── Command Palette Overlay ──────────────────────────────── */
+#command-palette {
     align: center middle;
-    width: 70%;
-    height: 70%;
+    width: 70;
+    height: 25;
     background: #050505;
     border: heavy #00ffd2;
     padding: 1 2;
 }
 
-#detail-modal .title {
+#command-palette-title {
     color: #00ffd2;
     text-style: bold;
+    margin-bottom: 1;
+    content-align: center middle;
 }
 
-#detail-modal .label {
-    color: #0a4a42;
-    text-style: bold;
-}
-
-#detail-modal .value {
-    color: #4d4d4d;
-}
-
-/* ── Search Input ──────────────────────────────────────── */
-
-#search-input-wide, #search-input-narrow {
-    dock: top;
-    height: 3;
+#command-palette-list {
+    height: 1fr;
     background: #050505;
-    border: tall #0a4a42;
+    border-top: solid #0a4a42;
+}
+
+/* ── Search Overlay ───────────────────────────────────────── */
+#search-overlay-container {
+    align: center middle;
+    width: 80;
+    height: 25;
+    background: #000000;
+    border: heavy #00ffd2;
+    padding: 1 2;
+}
+
+#search-overlay-title {
     color: #00ffd2;
-    display: none;
+    text-style: bold;
+    margin-bottom: 1;
+    content-align: center middle;
 }
 
-#search-input-wide.visible, #search-input-narrow.visible {
-    display: block;
+#search-overlay-list {
+    height: 1fr;
+    background: #000000;
+    border-top: solid #0a4a42;
 }
 
+/* ── Textual Input overrides ────────────────────────────── */
 Input {
     background: #050505;
     border: tall #0a4a42;
     color: #00ffd2;
+    margin-bottom: 1;
 }
 
 Input:focus {
     border: tall #00ffd2;
 }
 
-/* ── TabbedContent override ────────────────────────────── */
-
-TabbedContent {
-    background: #000000;
-}
-
-TabPane {
-    background: #050505;
-    padding: 0;
-}
-
-Tabs {
-    background: #000000;
-    border-bottom: solid #0a4a42;
-}
-
-Tab {
-    background: #000000;
-    color: #4d4d4d;
-}
-
-Tab:hover {
-    background: #0a4a42;
-    color: #00ffd2;
-}
-
-Tab.--active {
-    background: #050505;
-    color: #00ffd2;
-    text-style: bold;
-}
-
-/* ── Status Message Bar ────────────────────────────────── */
-
+/* ── Status Bar / Status message ─────────────────────────── */
 #status-message {
     dock: bottom;
     height: 1;
@@ -276,7 +221,6 @@ Tab.--active {
 }
 
 /* ── Footer ────────────────────────────────────────────── */
-
 Footer {
     background: #050505;
     color: #4d4d4d;
@@ -297,7 +241,6 @@ Footer > .footer--description {
 }
 
 /* ── Splash Screen ─────────────────────────────────────── */
-
 #splash-screen {
     background: #000000;
     align: center middle;
