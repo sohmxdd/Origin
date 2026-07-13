@@ -57,6 +57,14 @@ def main() -> None:
         shutil.rmtree(workspace_dir)
     os.makedirs(workspace_dir)
 
+    # Initialize a git repository and make a dummy commit so git-integration paths function
+    subprocess.run(["git", "init"], cwd=workspace_dir, capture_output=True, check=True)
+    dummy_file = os.path.join(workspace_dir, "dummy.txt")
+    with open(dummy_file, "w", encoding="utf-8") as f:
+        f.write("Initial project files")
+    subprocess.run(["git", "add", "dummy.txt"], cwd=workspace_dir, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=workspace_dir, capture_output=True, check=True)
+
     print_step("1. Initialize Origin Workspace")
     # Initialize a new workspace named 'DemoApp'
     init_out = run_cli_command(["init", "--name", "DemoApp"], cwd=workspace_dir)
@@ -151,7 +159,20 @@ def main() -> None:
     with open(claude_md_path, "r", encoding="utf-8") as f:
         print(f.read())
 
-    print_step("8. Run Origin doctor diagnostics")
+    print_step("8. Exercise Memory Entry Set/Get and Search")
+    # Set memory
+    mem_set_out = run_cli_command(["memory", "set", "tech_stack", "database", "postgresql"], cwd=workspace_dir)
+    print(mem_set_out)
+
+    # Get memory
+    mem_get_out = run_cli_command(["memory", "get", "tech_stack", "database"], cwd=workspace_dir)
+    print(f"Retrieved memory value: {mem_get_out.strip()}")
+
+    # Search artifacts
+    search_out = run_cli_command(["search", "postgresql"], cwd=workspace_dir)
+    print(search_out)
+
+    print_step("9. Run Origin doctor diagnostics")
     doctor_out = run_cli_command(["doctor"], cwd=workspace_dir)
     print(doctor_out)
 

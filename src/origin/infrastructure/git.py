@@ -27,6 +27,10 @@ class GitHelper:
             The 40-character commit SHA, or None if not in a git repo
             or if no commit exists yet.
         """
+        git_dir = os.path.join(self.workspace_path, ".git")
+        if not os.path.isdir(git_dir):
+            return None
+
         try:
             # Run git rev-parse HEAD in the workspace directory
             result = subprocess.run(

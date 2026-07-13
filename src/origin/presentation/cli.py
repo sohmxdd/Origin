@@ -337,10 +337,17 @@ def doctor() -> None:
     else:
         try:
             config = use_cases.load_config(root)
-            typer.secho(
-                f"[OK] config.yaml is valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').",
-                fg=typer.colors.GREEN,
-            )
+            if config.schema_version != "1.0":
+                typer.secho(
+                    f"[FAIL] schema_version mismatch: expected '1.0', found '{config.schema_version}'",
+                    fg=typer.colors.RED,
+                )
+                errors += 1
+            else:
+                typer.secho(
+                    f"[OK] config.yaml is valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').",
+                    fg=typer.colors.GREEN,
+                )
         except Exception as e:
             typer.secho(f"[FAIL] config.yaml failed validation: {e}", fg=typer.colors.RED)
             errors += 1

@@ -171,6 +171,20 @@ def test_cli_doctor(cli_runner: CliRunner) -> None:
     assert result.exit_code == 0
     assert "Workspace is healthy" in result.stdout
 
+    # Now simulate a schema mismatch
+    # Modify config.yaml directly
+    import yaml
+    config_path = ".origin/config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    config["schema_version"] = "2.0"
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(config, f)
+
+    doctor_result = cli_runner.invoke(app, ["doctor"])
+    assert doctor_result.exit_code == 1
+    assert "schema_version mismatch: expected '1.0', found '2.0'" in doctor_result.stdout
+
 
 def test_cli_mcp_config(cli_runner: CliRunner) -> None:
     """Verify mcp-config outputs Claude registration JSON."""
