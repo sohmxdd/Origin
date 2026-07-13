@@ -1,39 +1,85 @@
-"""SQLite infrastructure repository for Origin artifacts.
+"""SQLite index and YAML filesystem repository for Origin artifacts.
 
-Provides persistent storage, retrieval, and search over a single SQLite database table.
-Includes list serialization/deserialization and WAL mode configuration.
+Provides decentralized persistent storage using individual text files (YAML)
+as the source of truth, with a local SQLite database acting as a rebuildable
+query index/cache.
 """
 
 import json
+import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
+import yaml
 
 from origin.domain.models import Artifact, Decision, MemoryEntry, TimelineEvent
 
 
+def sanitize_name(name: str) -> str:
+    """Sanitize category or key names to be safe for filenames.
+
+    Allows alphanumeric characters, underscores, and hyphens.
+    """
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "", name)
+    if not sanitized:
+        raise ValueError(
+            f"Invalid identifier: '{name}'. Sanitized name cannot be empty."
+        )
+    return sanitized
+
+
+def atomic_write_yaml(file_path: str, data: dict) -> None:
+    """Write serialized data to a temporary file, then atomically replace the target file.
+
+    Args:
+        file_path: Target output path.
+        data: Serialization dictionary.
+    """
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    tmp_path = file_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+        # Atomically replace
+        os.replace(tmp_path, file_path)
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        raise e
+
+
 class ArtifactRepository:
-    """Repository class managing database persistence for all Origin artifacts."""
+    """Repository class managing YAML file persistence and SQLite indexing."""
 
     def __init__(self, db_path: str) -> None:
-        """Initialize the repository, open the database, and establish WAL mode.
+        """Initialize the repository and configure subdirectories.
 
         Args:
-            db_path: Absolute or relative path to the SQLite workspace database.
+            db_path: Path to the workspace index database (.origin/workspace.db).
         """
-        self.db_path = db_path
+        self.db_path = os.path.abspath(db_path)
+        self.origin_dir = os.path.dirname(self.db_path)
+        
+        self.decisions_dir = os.path.join(self.origin_dir, "decisions")
+        self.memory_dir = os.path.join(self.origin_dir, "memory")
+        self.timeline_dir = os.path.join(self.origin_dir, "timeline")
+
         self._init_db()
 
     def _get_connection(self) -> sqlite3.Connection:
         """Create a sqlite3.Connection with WAL mode enabled and dict-like row factory."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
-        # Enable Write-Ahead Logging (WAL) for concurrency
         conn.execute("PRAGMA journal_mode=WAL;")
         return conn
 
     def _init_db(self) -> None:
-        """Initialize the database schema if it doesn't already exist."""
+        """Initialize the SQLite index database schemas."""
+        os.makedirs(self.origin_dir, exist_ok=True)
         with self._get_connection() as conn:
             conn.execute(
                 """
@@ -66,44 +112,107 @@ class ArtifactRepository:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+                """
+            )
             conn.commit()
 
-    def _row_to_artifact(self, row: sqlite3.Row) -> Artifact:
-        """Map a database row dictionary to its appropriate Pydantic Artifact instance.
-
-        Args:
-            row: A sqlite3.Row instance from the artifacts table.
+    def _get_dir_state(self) -> Dict[str, Any]:
+        """Generate a fast checksum/mtime snapshot of the YAML subdirectories.
 
         Returns:
-            The parsed Decision, MemoryEntry, or TimelineEvent.
+            A dictionary tracking count and max mtime for each directory.
         """
-        data = dict(row)
-        art_type = data["type"]
+        state = {}
+        for sub, path in [
+            ("decisions", self.decisions_dir),
+            ("memory", self.memory_dir),
+            ("timeline", self.timeline_dir),
+        ]:
+            if not os.path.isdir(path):
+                state[sub] = {"count": 0, "max_mtime": 0.0}
+                continue
+            files = [
+                os.path.join(path, f)
+                for f in os.listdir(path)
+                if f.endswith(".yaml") and not f.endswith(".tmp")
+            ]
+            if not files:
+                state[sub] = {"count": 0, "max_mtime": 0.0}
+                continue
+            count = len(files)
+            max_mtime = max(os.path.getmtime(f) for f in files)
+            state[sub] = {"count": count, "max_mtime": max_mtime}
+        return state
 
-        if art_type == "decision":
-            # Deserialize JSON fields
-            alts = data.get("alternatives_considered")
-            affs = data.get("affected_files")
-            data["alternatives_considered"] = json.loads(alts) if alts else []
-            data["affected_files"] = json.loads(affs) if affs else []
-            return Decision.model_validate(data)
+    def _get_stored_sync_state(self) -> Optional[Dict[str, Any]]:
+        """Retrieve the last sync checksum snapshot from SQLite index metadata."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute("SELECT value FROM metadata WHERE key = 'last_sync_state'")
+                row = cursor.fetchone()
+                if row:
+                    return json.loads(row["value"])
+        except Exception:
+            pass
+        return None
 
-        elif art_type == "memory":
-            return MemoryEntry.model_validate(data)
+    def _set_stored_sync_state(self, state: Dict[str, Any]) -> None:
+        """Save the current sync checksum snapshot to SQLite index metadata."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_sync_state', ?)",
+                    (json.dumps(state),),
+                )
+                conn.commit()
+        except Exception:
+            pass
 
-        elif art_type == "timeline_event":
-            return TimelineEvent.model_validate(data)
+    def sync_index(self, force: bool = False) -> None:
+        """Synchronize SQLite cache index from YAML source files if changes are detected."""
+        current_state = self._get_dir_state()
 
-        else:
-            raise ValueError(f"Unknown artifact type in database: {art_type}")
+        if not force:
+            stored = self._get_stored_sync_state()
+            if stored == current_state:
+                return  # Database index is already fresh!
 
-    def save(self, artifact: Artifact) -> None:
-        """Save a new artifact or update an existing one.
+        # Clear and rebuild cache index
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM artifacts")
+            conn.commit()
 
-        Args:
-            artifact: The Decision, MemoryEntry, or TimelineEvent to persist.
-        """
-        # Serialize fields into a dictionary
+        # Re-index all directories
+        for folder, model_cls in [
+            (self.decisions_dir, Decision),
+            (self.memory_dir, MemoryEntry),
+            (self.timeline_dir, TimelineEvent),
+        ]:
+            if not os.path.isdir(folder):
+                continue
+            for f in os.listdir(folder):
+                if not f.endswith(".yaml") or f.endswith(".tmp"):
+                    continue
+                file_path = os.path.join(folder, f)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as file_obj:
+                        data = yaml.safe_load(file_obj)
+                    artifact = model_cls.model_validate(data)
+                    self._save_to_index(artifact)
+                except Exception as e:
+                    import sys
+                    print(f"Error indexing file {file_path}: {e}", file=sys.stderr)
+
+        self._set_stored_sync_state(current_state)
+
+    def _save_to_index(self, artifact: Artifact) -> None:
+        """Save an artifact record directly to SQLite index (no file IO)."""
         data: Dict[str, Any] = {
             "id": artifact.id,
             "type": artifact.type,
@@ -114,7 +223,7 @@ class ArtifactRepository:
             "superseded_by": artifact.superseded_by,
         }
 
-        # Clear other type fields to ensure clean row schema representation
+        # Clear other type fields
         for field in [
             "title", "rationale", "alternatives_considered", "affected_files", "confidence",
             "category", "key", "value",
@@ -140,7 +249,6 @@ class ArtifactRepository:
             data["commit_sha"] = artifact.commit_sha
             data["summary"] = artifact.summary
 
-        # Insert or Replace
         columns = ", ".join(data.keys())
         placeholders = ", ".join(["?"] * len(data))
         values = list(data.values())
@@ -151,6 +259,55 @@ class ArtifactRepository:
             conn.execute(query, values)
             conn.commit()
 
+    def _row_to_artifact(self, row: sqlite3.Row) -> Artifact:
+        """Map a database row dictionary to its appropriate Pydantic Artifact instance."""
+        data = dict(row)
+        art_type = data["type"]
+
+        if art_type == "decision":
+            alts = data.get("alternatives_considered")
+            affs = data.get("affected_files")
+            data["alternatives_considered"] = json.loads(alts) if alts else []
+            data["affected_files"] = json.loads(affs) if affs else []
+            return Decision.model_validate(data)
+
+        elif art_type == "memory":
+            return MemoryEntry.model_validate(data)
+
+        elif art_type == "timeline_event":
+            return TimelineEvent.model_validate(data)
+
+        else:
+            raise ValueError(f"Unknown artifact type in database: {art_type}")
+
+    def save(self, artifact: Artifact) -> None:
+        """Save a new artifact or update an existing one to filesystem (source of truth).
+
+        Args:
+            artifact: The Decision, MemoryEntry, or TimelineEvent to persist.
+        """
+        # Determine target file path
+        if isinstance(artifact, Decision):
+            file_path = os.path.join(self.decisions_dir, f"{artifact.id}.yaml")
+        elif isinstance(artifact, MemoryEntry):
+            cat_san = sanitize_name(artifact.category)
+            key_san = sanitize_name(artifact.key)
+            file_path = os.path.join(self.memory_dir, f"{cat_san}.{key_san}.yaml")
+        elif isinstance(artifact, TimelineEvent):
+            file_path = os.path.join(self.timeline_dir, f"{artifact.id}.yaml")
+        else:
+            raise ValueError(f"Unknown artifact type: {type(artifact)}")
+
+        # Serialize Pydantic model to JSON format first to clean dates, then write YAML
+        serialized_data = artifact.model_dump(mode="json")
+        atomic_write_yaml(file_path, serialized_data)
+
+        # Mirror write to the local index directly to keep cache fast
+        self._save_to_index(artifact)
+
+        # Update metadata sync state immediately to avoid triggering sync checks on subsequent read
+        self._set_stored_sync_state(self._get_dir_state())
+
     def get(self, artifact_id: str) -> Optional[Artifact]:
         """Retrieve an artifact by its unique ID.
 
@@ -160,6 +317,7 @@ class ArtifactRepository:
         Returns:
             The Artifact instance if found, otherwise None.
         """
+        self.sync_index()
         with self._get_connection() as conn:
             cursor = conn.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,))
             row = cursor.fetchone()
@@ -171,12 +329,13 @@ class ArtifactRepository:
         """Retrieve an active memory entry by its category and key.
 
         Args:
-            category: The category of the memory (e.g. architecture).
+            category: The category of the memory (e.g. tech_stack).
             key: The key identifier.
 
         Returns:
             The MemoryEntry instance if found and active, otherwise None.
         """
+        self.sync_index()
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "SELECT * FROM artifacts WHERE type = 'memory' AND category = ? AND key = ? AND status = 'active'",
@@ -193,11 +352,12 @@ class ArtifactRepository:
         """List decision artifacts, optionally filtered by status.
 
         Args:
-            status: Optional status to filter by (e.g. "active", "superseded").
+            status: Optional status to filter by (e.g. "active", "superseded", "proposed").
 
         Returns:
             A list of Decision objects, sorted by created_at ascending.
         """
+        self.sync_index()
         query = "SELECT * FROM artifacts WHERE type = 'decision'"
         params: List[str] = []
         if status:
@@ -220,6 +380,7 @@ class ArtifactRepository:
         Returns:
             A list of active MemoryEntry objects, sorted by category and key.
         """
+        self.sync_index()
         query = "SELECT * FROM artifacts WHERE type = 'memory' AND status = 'active' ORDER BY category ASC, key ASC"
         entries: List[MemoryEntry] = []
         with self._get_connection() as conn:
@@ -236,6 +397,7 @@ class ArtifactRepository:
         Returns:
             A list of TimelineEvent objects, sorted by created_at ascending.
         """
+        self.sync_index()
         query = "SELECT * FROM artifacts WHERE type = 'timeline_event' ORDER BY created_at ASC"
         events: List[TimelineEvent] = []
         with self._get_connection() as conn:
@@ -251,32 +413,19 @@ class ArtifactRepository:
 
         Args:
             artifact_id: The ID of the artifact to update.
-            status: The new status value.
+            status: The new status value (e.g. active, superseded, rejected).
             superseded_by: Optional ID of the artifact replacing this one.
         """
-        now_str = datetime.now(timezone.utc).isoformat()
-        with self._get_connection() as conn:
-            conn.execute(
-                """
-                UPDATE artifacts
-                SET status = ?, superseded_by = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (status, superseded_by, now_str, artifact_id),
-            )
-            conn.commit()
+        artifact = self.get(artifact_id)
+        if artifact:
+            artifact.status = status  # type: ignore
+            artifact.superseded_by = superseded_by
+            artifact.updated_at = datetime.now(timezone.utc)
+            self.save(artifact)
 
     def search(self, query: str) -> List[Artifact]:
-        """Perform keyword search across decisions and memory entries.
-
-        Matches against decision title, rationale, and memory key/value.
-
-        Args:
-            query: The search term to match.
-
-        Returns:
-            A list of matching Artifact objects.
-        """
+        """Perform keyword search across decisions and memory entries."""
+        self.sync_index()
         sql_query = """
             SELECT * FROM artifacts
             WHERE type IN ('decision', 'memory')

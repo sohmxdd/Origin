@@ -80,3 +80,50 @@ origin export --target claude-code || true
             pass  # os.chmod doesn't support execution permissions on Windows standard filesystems
 
         return True
+
+    def get_commits_with_trailer(self) -> list[dict]:
+        """Scan git log looking for Origin-Decision: <id> trailers.
+
+        Returns:
+            A list of dicts with 'sha', 'subject', and 'decision_ids'.
+        """
+        import re
+        git_dir = os.path.join(self.workspace_path, ".git")
+        if not os.path.isdir(git_dir):
+            return []
+
+        try:
+            result = subprocess.run(
+                ["git", "log", "--grep=Origin-Decision:", "--pretty=format:%H%n%s%n%b%n---"],
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            commits = []
+            raw_log = result.stdout.strip()
+            if not raw_log:
+                return []
+
+            # Split by newlines separating commits with boundary '---'
+            parts = raw_log.split("\n---\n")
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                lines = part.split("\n", 2)
+                if len(lines) < 2:
+                    continue
+                sha = lines[0].strip()
+                subject = lines[1].strip()
+                
+                dec_ids = re.findall(r"Origin-Decision:\s*(dec_[a-zA-Z0-9_]+)", part)
+                if dec_ids:
+                    commits.append({
+                        "sha": sha,
+                        "subject": subject,
+                        "decision_ids": list(set(dec_ids)),
+                    })
+            return commits
+        except Exception:
+            return []

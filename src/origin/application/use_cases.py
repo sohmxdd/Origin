@@ -82,6 +82,7 @@ def add_decision(
     affected_files: List[str],
     confidence: float,
     originating_agent: str,
+    status: str = "active",
 ) -> Decision:
     """Record a new decision artifact and log a timeline event.
 
@@ -93,6 +94,7 @@ def add_decision(
         affected_files: Files affected.
         confidence: Confidence score (0.0 to 1.0).
         originating_agent: Name of the agent recording the decision.
+        status: The initial status of the decision (active or proposed).
 
     Returns:
         The created Decision instance.
@@ -108,13 +110,14 @@ def add_decision(
         confidence=confidence,
         originating_agent=originating_agent,
     )
+    decision.status = status  # type: ignore
     repo.save(decision)
 
     # Create and save TimelineEvent
     commit_sha = git.get_current_commit_sha()
     event = TimelineEvent.create(
         event_type="decision_created",
-        summary=f"Decision created: '{title}'",
+        summary=f"Decision {status}: '{title}'",
         originating_agent=originating_agent,
         ref_artifact_id=decision.id,
         commit_sha=commit_sha,
@@ -304,3 +307,303 @@ def get_context_bundle(workspace_root: str) -> str:
     decisions = repo.list_decisions(status="active")
     memories = repo.list_memory()
     return mirror.generate_context_bundle(decisions, memories)
+
+
+def accept_decision(workspace_root: str, decision_id: str, agent: str) -> Decision:
+    """Accept a proposed decision, transitioning its status to active.
+
+    Args:
+        workspace_root: Path to the workspace root directory.
+        decision_id: The ID of the decision to accept.
+        agent: Name of the agent accepting the decision.
+
+    Returns:
+        The updated Decision instance.
+    """
+    repo, mirror, git = _get_infra(workspace_root)
+    decision = repo.get(decision_id)
+    if not decision or not isinstance(decision, Decision):
+        raise DecisionNotFoundError(f"Decision with ID '{decision_id}' not found.")
+
+    decision.status = "active"
+    decision.updated_at = datetime.now(timezone.utc)
+    decision.originating_agent = agent
+    repo.save(decision)
+
+    commit_sha = git.get_current_commit_sha()
+    event = TimelineEvent.create(
+        event_type="decision_created",
+        summary=f"Decision accepted: '{decision.title}'",
+        originating_agent=agent,
+        ref_artifact_id=decision.id,
+        commit_sha=commit_sha,
+    )
+    repo.save(event)
+    mirror.refresh_all(repo)
+    return decision
+
+
+def reject_decision(workspace_root: str, decision_id: str, agent: str) -> Decision:
+    """Reject a proposed decision, transitioning its status to rejected.
+
+    Args:
+        workspace_root: Path to the workspace root directory.
+        decision_id: The ID of the decision to reject.
+        agent: Name of the agent rejecting the decision.
+
+    Returns:
+        The updated Decision instance.
+    """
+    repo, mirror, git = _get_infra(workspace_root)
+    decision = repo.get(decision_id)
+    if not decision or not isinstance(decision, Decision):
+        raise DecisionNotFoundError(f"Decision with ID '{decision_id}' not found.")
+
+    decision.status = "rejected"
+    decision.updated_at = datetime.now(timezone.utc)
+    decision.originating_agent = agent
+    repo.save(decision)
+
+    commit_sha = git.get_current_commit_sha()
+    event = TimelineEvent.create(
+        event_type="decision_superseded",
+        summary=f"Decision rejected: '{decision.title}'",
+        originating_agent=agent,
+        ref_artifact_id=decision.id,
+        commit_sha=commit_sha,
+    )
+    repo.save(event)
+    mirror.refresh_all(repo)
+    return decision
+
+
+def sync_git_commits(workspace_root: str, agent: str = "human") -> None:
+    """Scan git log for Origin-Decision trailers and record commit events idempotently.
+
+    Args:
+        workspace_root: Path to the workspace root directory.
+        agent: The originating agent mapping the commits.
+    """
+    repo, mirror, git = _get_infra(workspace_root)
+    commits = git.get_commits_with_trailer()
+    if not commits:
+        return
+
+    repo.sync_index()
+    existing_events = {}
+    with repo._get_connection() as conn:
+        cursor = conn.execute(
+            "SELECT ref_artifact_id, commit_sha FROM artifacts WHERE type = 'timeline_event' AND event_type = 'commit'"
+        )
+        for row in cursor:
+            existing_events[(row["ref_artifact_id"], row["commit_sha"])] = True
+
+    new_events_created = False
+    for commit in commits:
+        sha = commit["sha"]
+        subject = commit["subject"]
+        for dec_id in commit["decision_ids"]:
+            if (dec_id, sha) in existing_events:
+                continue
+
+            event = TimelineEvent.create(
+                event_type="commit",
+                summary=f"Commit {sha[:7]}: {subject}",
+                originating_agent=agent,
+                ref_artifact_id=dec_id,
+                commit_sha=sha,
+            )
+            repo.save(event)
+            existing_events[(dec_id, sha)] = True
+            new_events_created = True
+
+    if new_events_created:
+        mirror.refresh_all(repo)
+
+
+def migrate_workspace(workspace_root: str) -> None:
+    """Migrates a v1.0 SQLite-only workspace to a v2.0 filesystem-first workspace.
+
+    Args:
+        workspace_root: Path to the workspace root directory.
+    """
+    origin_dir = get_origin_dir(workspace_root)
+    db_path = os.path.join(origin_dir, "workspace.db")
+    if not os.path.exists(db_path):
+        return
+
+    # Check if already migrated
+    try:
+        config = load_config(workspace_root)
+        if config.schema_version == "2.0":
+            return
+    except Exception:
+        pass
+
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='artifacts'")
+    if not cursor.fetchone():
+        conn.close()
+        return
+
+    cursor = conn.execute("SELECT * FROM artifacts")
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Re-initialize repository
+    repo = ArtifactRepository(db_path)
+
+    import json
+    for row in rows:
+        data = dict(row)
+        art_type = data["type"]
+
+        if art_type == "decision":
+            alts = data.get("alternatives_considered")
+            affs = data.get("affected_files")
+            data["alternatives_considered"] = json.loads(alts) if alts else []
+            data["affected_files"] = json.loads(affs) if affs else []
+            artifact = Decision.model_validate(data)
+        elif art_type == "memory":
+            artifact = MemoryEntry.model_validate(data)
+        elif art_type == "timeline_event":
+            artifact = TimelineEvent.model_validate(data)
+        else:
+            continue
+
+        repo.save(artifact)
+
+    config = WorkspaceConfig(workspace_name=load_config(workspace_root).workspace_name)
+    config.schema_version = "2.0"
+    save_config(workspace_root, config)
+
+    repo.sync_index(force=True)
+    mirror = MirrorWriter(origin_dir, config.workspace_name, "2.0")
+    mirror.refresh_all(repo)
+
+
+def import_conventions(workspace_root: str) -> List[dict]:
+    """Scan project manifest files for high-signal tech stack and conventions memory.
+
+    Files scanned:
+      - pyproject.toml / requirements.txt (Python deps)
+      - package.json (JS/TS deps)
+      - docker-compose.yml (infra services)
+
+    Falls back to README.md/ARCHITECTURE.md keyword parsing if no manifest findings exist.
+    """
+    suggestions = []
+
+    # 1. Parse pyproject.toml
+    pyproject_path = os.path.join(workspace_root, "pyproject.toml")
+    if os.path.exists(pyproject_path):
+        suggestions.append({
+            "category": "tech_stack",
+            "key": "language",
+            "value": "python",
+        })
+        try:
+            with open(pyproject_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                for fw in ["django", "flask", "fastapi", "pytest"]:
+                    if fw in content.lower():
+                        suggestions.append({
+                            "category": "tech_stack",
+                            "key": "framework",
+                            "value": fw,
+                        })
+        except Exception:
+            pass
+
+    # 2. Parse requirements.txt
+    reqs_path = os.path.join(workspace_root, "requirements.txt")
+    if os.path.exists(reqs_path):
+        suggestions.append({
+            "category": "tech_stack",
+            "key": "language",
+            "value": "python",
+        })
+        try:
+            with open(reqs_path, "r", encoding="utf-8") as f:
+                content = f.read().lower()
+                for fw in ["django", "flask", "fastapi", "pytest"]:
+                    if fw in content:
+                        suggestions.append({
+                            "category": "tech_stack",
+                            "key": "framework",
+                            "value": fw,
+                        })
+        except Exception:
+            pass
+
+    # 3. Parse package.json
+    pkg_path = os.path.join(workspace_root, "package.json")
+    if os.path.exists(pkg_path):
+        suggestions.append({
+            "category": "tech_stack",
+            "key": "language",
+            "value": "javascript/typescript",
+        })
+        try:
+            with open(pkg_path, "r", encoding="utf-8") as f:
+                content = f.read().lower()
+                for fw in ["react", "vue", "next", "express", "nestjs"]:
+                    if fw in content:
+                        suggestions.append({
+                            "category": "tech_stack",
+                            "key": "framework",
+                            "value": fw,
+                        })
+        except Exception:
+            pass
+
+    # 4. Parse docker-compose.yml
+    compose_path = os.path.join(workspace_root, "docker-compose.yml")
+    if os.path.exists(compose_path):
+        try:
+            with open(compose_path, "r", encoding="utf-8") as f:
+                content = f.read().lower()
+                for db in ["postgres", "mysql", "redis", "mongodb"]:
+                    if db in content:
+                        suggestions.append({
+                            "category": "tech_stack",
+                            "key": "database",
+                            "value": db,
+                        })
+        except Exception:
+            pass
+
+    # Fallback to README/ARCHITECTURE keyword scanning if suggestions list is empty
+    if not suggestions:
+        for filename in ["README.md", "ARCHITECTURE.md"]:
+            doc_path = os.path.join(workspace_root, filename)
+            if os.path.exists(doc_path):
+                try:
+                    with open(doc_path, "r", encoding="utf-8") as f:
+                        content = f.read().lower()
+                        if "python" in content:
+                            suggestions.append({"category": "tech_stack", "key": "language", "value": "python"})
+                        if "javascript" in content or "typescript" in content:
+                            suggestions.append({"category": "tech_stack", "key": "language", "value": "javascript/typescript"})
+                        if "fastapi" in content:
+                            suggestions.append({"category": "tech_stack", "key": "framework", "value": "fastapi"})
+                        if "postgresql" in content or "postgres" in content:
+                            suggestions.append({"category": "tech_stack", "key": "database", "value": "postgres"})
+                        if "sqlite" in content:
+                            suggestions.append({"category": "tech_stack", "key": "database", "value": "sqlite"})
+                except Exception:
+                    pass
+
+    # Deduplicate suggestions by (category, key)
+    seen = set()
+    deduped = []
+    for s in suggestions:
+        pair = (s["category"], s["key"])
+        if pair not in seen:
+            seen.add(pair)
+            deduped.append(s)
+
+    return deduped

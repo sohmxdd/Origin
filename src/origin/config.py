@@ -15,7 +15,7 @@ class WorkspaceConfig(BaseModel):
     """Pydantic model representing workspace config.yaml."""
 
     workspace_name: str = Field(description="Name of the workspace project")
-    schema_version: str = Field(default="1.0", description="Schema version of the Origin metadata")
+    schema_version: str = Field(default="2.0", description="Schema version of the Origin metadata")
     agent_allowlist: List[str] = Field(
         default_factory=lambda: ["claude-code", "codex-cli", "human"],
         description="Allowlist of agents that can write artifacts",

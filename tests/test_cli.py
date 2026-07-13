@@ -59,7 +59,7 @@ def test_cli_decision_add_and_list(cli_runner: CliRunner) -> None:
     list_result = cli_runner.invoke(app, ["decision", "list"])
     assert list_result.exit_code == 0
     assert "Pick Postgres" in list_result.stdout
-    assert "Confidence: 0.90" in list_result.stdout
+    assert "0.90" in list_result.stdout
 
 
 def test_cli_decision_supersede(cli_runner: CliRunner) -> None:
@@ -151,7 +151,8 @@ def test_cli_search_and_context(cli_runner: CliRunner) -> None:
     # Test search
     search_result = cli_runner.invoke(app, ["search", "fastapi"])
     assert search_result.exit_code == 0
-    assert "Memory: tech_stack.framework = 'fastapi'" in search_result.stdout
+    assert "tech_stack.framework" in search_result.stdout
+    assert "fastapi" in search_result.stdout
 
 
 def test_cli_export(cli_runner: CliRunner) -> None:
@@ -177,13 +178,13 @@ def test_cli_doctor(cli_runner: CliRunner) -> None:
     config_path = ".origin/config.yaml"
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
-    config["schema_version"] = "2.0"
+    config["schema_version"] = "3.0"
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f)
 
     doctor_result = cli_runner.invoke(app, ["doctor"])
     assert doctor_result.exit_code == 1
-    assert "schema_version mismatch: expected '1.0', found '2.0'" in doctor_result.stdout
+    assert "schema_version mismatch: expected '2.0', found '3.0'" in doctor_result.stdout
 
 
 def test_cli_mcp_config(cli_runner: CliRunner) -> None:

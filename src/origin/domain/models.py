@@ -19,7 +19,7 @@ class ArtifactBase(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     originating_agent: str = Field(description="e.g. 'claude-code', 'codex-cli', 'human'")
-    status: Literal["active", "superseded", "deprecated"] = "active"
+    status: Literal["active", "superseded", "deprecated", "proposed", "rejected"] = "active"
     superseded_by: str | None = None
 
 
@@ -93,7 +93,7 @@ class TimelineEvent(ArtifactBase):
     """Represents an automatically generated event logging history."""
 
     type: Literal["timeline_event"] = "timeline_event"
-    event_type: Literal["decision_created", "decision_superseded", "memory_updated"]
+    event_type: Literal["decision_created", "decision_superseded", "memory_updated", "commit"]
     ref_artifact_id: str | None = None
     commit_sha: str | None = None
     summary: str
@@ -101,7 +101,7 @@ class TimelineEvent(ArtifactBase):
     @classmethod
     def create(
         cls,
-        event_type: Literal["decision_created", "decision_superseded", "memory_updated"],
+        event_type: Literal["decision_created", "decision_superseded", "memory_updated", "commit"],
         summary: str,
         originating_agent: str,
         ref_artifact_id: str | None = None,

@@ -53,8 +53,16 @@ def main() -> None:
     workspace_dir = os.path.join(root_dir, "demo_workspace")
 
     # Clean up previous runs
+    def remove_readonly(func, path, _):
+        import stat
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except Exception:
+            pass
+
     if os.path.exists(workspace_dir):
-        shutil.rmtree(workspace_dir)
+        shutil.rmtree(workspace_dir, onexc=remove_readonly)
     os.makedirs(workspace_dir)
 
     # Initialize a git repository and make a dummy commit so git-integration paths function
@@ -70,7 +78,7 @@ def main() -> None:
     init_out = run_cli_command(["init", "--name", "DemoApp"], cwd=workspace_dir)
     print(init_out)
 
-    print_step("2. Record first architectural decision")
+    print_step("2. Record proposed decision (AI agent suggestion)")
     # Add a decision: Use Postgres over MongoDB
     add_out = run_cli_command(
         [
@@ -88,35 +96,70 @@ def main() -> None:
             "SQLite",
             "--file",
             "src/db/connection.py",
+            "--propose",
         ],
         cwd=workspace_dir,
     )
     print(add_out)
 
     # Extract decision ID from output
-    # Sample output: "Successfully recorded Decision dec_01HXYZ...: '...'"
+    # Sample output: "Successfully recorded Decision dec_01HXYZ... (proposed): '...'"
     dec_id = ""
     for line in add_out.splitlines():
         if "Successfully recorded Decision" in line:
             parts = line.split("Decision ")
             if len(parts) > 1:
-                dec_id = parts[1].split(":")[0].strip()
+                dec_id = parts[1].split(" ")[0].strip()
     
     if not dec_id:
         print("Error: Could not extract decision ID from output.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Extracted Decision ID: {dec_id}")
+    print(f"Extracted Proposed Decision ID: {dec_id}")
 
-    print_step("3. Export context to CLAUDE.md")
-    # Export flat-file context block to CLAUDE.md
-    export_out = run_cli_command(["export", "--target", "claude-code"], cwd=workspace_dir)
-    print(export_out)
+    # List proposed decisions
+    print("\nProposed decisions list:")
+    print(run_cli_command(["decision", "list", "--status", "proposed"], cwd=workspace_dir))
 
-    print_step("4. Inspect the generated CLAUDE.md (Simulating fresh agent session)")
-    claude_md_path = os.path.join(workspace_dir, "CLAUDE.md")
-    with open(claude_md_path, "r", encoding="utf-8") as f:
-        print(f.read())
+    print_step("3. Accept the proposed decision (Developer approval)")
+    accept_out = run_cli_command(["decision", "accept", dec_id], cwd=workspace_dir)
+    print(accept_out)
+
+    print_step("4. Record and Reject a proposed decision")
+    bad_decision_out = run_cli_command(
+        [
+            "decision",
+            "add",
+            "--title",
+            "Use raw text files for data caching",
+            "--rationale",
+            "Very simple to implement.",
+            "--confidence",
+            "0.4",
+            "--alternative",
+            "None",
+            "--file",
+            "src/cache.py",
+            "--propose",
+        ],
+        cwd=workspace_dir,
+    )
+    print(bad_decision_out)
+
+    bad_dec_id = ""
+    for line in bad_decision_out.splitlines():
+        if "Successfully recorded Decision" in line:
+            parts = line.split("Decision ")
+            if len(parts) > 1:
+                bad_dec_id = parts[1].split(" ")[0].strip()
+
+    print(f"Rejecting Proposed Decision ID: {bad_dec_id}")
+    reject_out = run_cli_command(["decision", "reject", bad_dec_id], cwd=workspace_dir)
+    print(reject_out)
+
+    # List rejected
+    print("\nRejected decisions list:")
+    print(run_cli_command(["decision", "list", "--status", "rejected"], cwd=workspace_dir))
 
     print_step("5. Record a second decision superseding the first")
     # Supersede PostgreSQL choice with PostgreSQL + pgvector
@@ -153,9 +196,10 @@ def main() -> None:
     superseded_out = run_cli_command(["decision", "list", "--status", "superseded"], cwd=workspace_dir)
     print(superseded_out)
 
-    print_step("7. Refresh CLAUDE.md and verify the updated context")
+    print_step("7. Export context to CLAUDE.md & Inspect")
     # Export flat-file context block again
     run_cli_command(["export", "--target", "claude-code"], cwd=workspace_dir)
+    claude_md_path = os.path.join(workspace_dir, "CLAUDE.md")
     with open(claude_md_path, "r", encoding="utf-8") as f:
         print(f.read())
 
@@ -172,7 +216,31 @@ def main() -> None:
     search_out = run_cli_command(["search", "postgresql"], cwd=workspace_dir)
     print(search_out)
 
-    print_step("9. Run Origin doctor diagnostics")
+    print_step("9. Simulate database drift / index deletion & run doctor --fix")
+    # Delete workspace.db manually to simulate a missing index
+    db_path = os.path.join(workspace_dir, ".origin", "workspace.db")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    print("Deleted workspace.db file. Running doctor check...")
+    
+    # Run doctor (should show fail since db is missing)
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "origin.presentation.cli", "doctor"],
+            cwd=workspace_dir,
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"Doctor correctly failed as index was missing (exit code {e.returncode}):")
+        print(e.stdout.decode("utf-8"))
+
+    # Run doctor --fix
+    print("Running doctor --fix to restore index from YAML files...")
+    fix_out = run_cli_command(["doctor", "--fix"], cwd=workspace_dir)
+    print(fix_out)
+
+    print_step("10. Run final Origin doctor health diagnostics")
     doctor_out = run_cli_command(["doctor"], cwd=workspace_dir)
     print(doctor_out)
 

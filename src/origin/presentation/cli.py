@@ -9,6 +9,9 @@ import sys
 from typing import List, Optional
 import typer
 
+from rich.console import Console
+from rich.table import Table
+
 from origin.application import use_cases
 from origin.exceptions import OriginError, WorkspaceNotInitializedError
 from origin.adapters.flat_file import export_flat_file
@@ -98,6 +101,9 @@ def init(
     with_hooks: bool = typer.Option(
         False, "--with-hooks", help="Install git pre-commit hook to auto-run origin export."
     ),
+    import_stack: bool = typer.Option(
+        False, "--import", help="Import stack recommendations from project files during setup."
+    ),
 ) -> None:
     """Initialize a new Origin workspace in the current directory."""
     cwd = os.getcwd()
@@ -111,6 +117,22 @@ def init(
         )
         if with_hooks:
             typer.secho("Git pre-commit hooks successfully installed.", fg=typer.colors.CYAN)
+
+        if import_stack:
+            typer.echo("\nScanning for project manifest recommendations...")
+            recommendations = use_cases.import_conventions(cwd)
+            if not recommendations:
+                typer.secho("No clear tech stack recommendations found.", fg=typer.colors.YELLOW)
+            else:
+                typer.secho(f"Found {len(recommendations)} recommendations. Reviewing interactively:", fg=typer.colors.CYAN)
+                for rec in recommendations:
+                    cat = rec["category"]
+                    key = rec["key"]
+                    val = rec["value"]
+                    confirm = typer.confirm(f"Save memory entry: {cat}.{key} = '{val}'?")
+                    if confirm:
+                        use_cases.set_memory(cwd, cat, key, val, originating_agent="human")
+                        typer.secho(f"Saved: {cat}.{key} = '{val}'", fg=typer.colors.GREEN)
     except OriginError as e:
         typer.secho(str(e), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -127,9 +149,11 @@ def decision_add(
     files: Optional[List[str]] = typer.Option(
         None, "--file", "-f", help="Affected file path. Can specify multiple times."
     ),
+    propose: bool = typer.Option(False, "--propose", help="Record decision as proposed instead of active."),
 ) -> None:
     """Record a new architectural decision (interactive by default)."""
     root = find_workspace_root()
+    status = "proposed" if propose else "active"
     try:
         title, rationale, confidence, alternatives, files = prompt_decision_interactive(
             title, rationale, confidence, alternatives, files
@@ -143,9 +167,38 @@ def decision_add(
             affected_files=files,
             confidence=confidence,
             originating_agent="human",
+            status=status,
         )
 
-        typer.secho(f"Successfully recorded Decision {dec.id}: '{dec.title}'", fg=typer.colors.GREEN)
+        typer.secho(f"Successfully recorded Decision {dec.id} ({status}): '{dec.title}'", fg=typer.colors.GREEN)
+    except OriginError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
+@decision_app.command("accept")
+def decision_accept(
+    decision_id: str = typer.Argument(..., help="The ID of the proposed decision to accept.")
+) -> None:
+    """Accept and activate a proposed decision."""
+    root = find_workspace_root()
+    try:
+        dec = use_cases.accept_decision(root, decision_id, agent="human")
+        typer.secho(f"Successfully accepted proposed Decision {dec.id}: '{dec.title}'", fg=typer.colors.GREEN)
+    except OriginError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
+@decision_app.command("reject")
+def decision_reject(
+    decision_id: str = typer.Argument(..., help="The ID of the proposed decision to reject.")
+) -> None:
+    """Reject a proposed decision."""
+    root = find_workspace_root()
+    try:
+        dec = use_cases.reject_decision(root, decision_id, agent="human")
+        typer.secho(f"Successfully rejected proposed Decision {dec.id}: '{dec.title}'", fg=typer.colors.RED)
     except OriginError as e:
         typer.secho(str(e), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -154,7 +207,10 @@ def decision_add(
 @decision_app.command("list")
 def decision_list(
     status: Optional[str] = typer.Option(
-        "active", "--status", "-s", help="Filter by status (active or superseded)."
+        "active", "--status", "-s", help="Filter by status (active, superseded, proposed, or rejected)."
+    ),
+    affects: Optional[str] = typer.Option(
+        None, "--affects", help="Filter decisions affecting a specific file."
     )
 ) -> None:
     """List recorded decisions in this workspace."""
@@ -166,14 +222,30 @@ def decision_list(
         repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
 
         decisions = repo.list_decisions(status=status)
+        if affects:
+            decisions = [dec for dec in decisions if affects in dec.affected_files]
+
         if not decisions:
-            typer.echo(f"No decisions found with status '{status}'.")
+            typer.echo(f"No decisions found with status '{status}'" + (f" affecting '{affects}'" if affects else "") + ".")
             return
 
-        typer.secho(f"--- Decisions List ({status}) ---", fg=typer.colors.BLUE, bold=True)
+        console = Console()
+        table = Table(title=f"Origin Decisions ({status})")
+        table.add_column("ID", style="dim", width=30)
+        table.add_column("Title", style="bold cyan")
+        table.add_column("Confidence", justify="right")
+        table.add_column("Details", style="green")
+
         for dec in decisions:
-            superseded_str = f" -> superseded by {dec.superseded_by}" if dec.superseded_by else ""
-            typer.echo(f"[{dec.id}] {dec.title} (Confidence: {dec.confidence:.2f}){superseded_str}")
+            superseded_str = f"\nSuperseded by: {dec.superseded_by}" if dec.superseded_by else ""
+            affected_str = f"Files: {', '.join(dec.affected_files)}" if dec.affected_files else "No files listed"
+            table.add_row(
+                dec.id,
+                dec.title,
+                f"{dec.confidence:.2f}",
+                affected_str + superseded_str
+            )
+        console.print(table)
     except OriginError as e:
         typer.secho(str(e), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -287,12 +359,20 @@ def search(query: str = typer.Argument(..., help="Keyword query string.")) -> No
             typer.echo("No matching artifacts found.")
             return
 
-        typer.secho(f"--- Search Results for '{query}' ---", fg=typer.colors.BLUE, bold=True)
+        console = Console()
+        table = Table(title=f"Origin Search Results: '{query}'")
+        table.add_column("Type", style="bold magenta")
+        table.add_column("ID / Key", style="dim", width=30)
+        table.add_column("Title / Value", style="cyan")
+        table.add_column("Status", justify="center")
+
         for art in results:
             if art.type == "decision":
-                typer.echo(f"[{art.id}] Decision: '{art.title}' (Status: {art.status})")
+                status_style = "green" if art.status == "active" else "yellow" if art.status == "proposed" else "red"
+                table.add_row("Decision", art.id, art.title, f"[{status_style}]{art.status}[/{status_style}]")
             elif art.type == "memory":
-                typer.echo(f"[{art.id}] Memory: {art.category}.{art.key} = '{art.value}'")
+                table.add_row("Memory", f"{art.category}.{art.key}", art.value, "[green]active[/green]")
+        console.print(table)
     except OriginError as e:
         typer.secho(str(e), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -310,6 +390,8 @@ def export(
     """Refresh and export flat-file context files."""
     root = find_workspace_root()
     try:
+        # Sync git commits to record trailers
+        use_cases.sync_git_commits(root)
         dest = export_flat_file(root, target)
         typer.secho(f"Successfully exported context to {dest}", fg=typer.colors.GREEN)
     except Exception as e:
@@ -318,16 +400,38 @@ def export(
 
 
 @app.command("doctor")
-def doctor() -> None:
+def doctor(
+    fix: bool = typer.Option(False, "--fix", help="Automatically repair index drift and refresh mirrors.")
+) -> None:
     """Sanity check the integrity, configurations, and schema of the workspace."""
     root = find_workspace_root()
     origin_dir = os.path.join(root, ".origin")
 
     if not os.path.isdir(origin_dir):
-        typer.secho(f"Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
+        typer.secho("Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
+    if fix:
+        typer.secho("Fixing workspace index and mirrors...", fg=typer.colors.CYAN)
+        try:
+            config = use_cases.load_config(root)
+            from origin.infrastructure.database import ArtifactRepository
+            repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
+            repo.sync_index(force=True)
+
+            from origin.infrastructure.mirror import MirrorWriter
+            mirror = MirrorWriter(origin_dir, config.workspace_name, config.schema_version)
+            mirror.refresh_all(repo)
+
+            export_flat_file(root, "generic")
+            export_flat_file(root, "claude-code")
+            typer.secho("[OK] Rebuilt SQLite index cache and regenerated mirrors.", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"Error executing fix: {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
     errors = 0
+    warnings = 0
 
     # 1. Check config.yaml
     config_path = os.path.join(origin_dir, "config.yaml")
@@ -337,9 +441,9 @@ def doctor() -> None:
     else:
         try:
             config = use_cases.load_config(root)
-            if config.schema_version != "1.0":
+            if config.schema_version != "2.0":
                 typer.secho(
-                    f"[FAIL] schema_version mismatch: expected '1.0', found '{config.schema_version}'",
+                    f"[FAIL] schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
                     fg=typer.colors.RED,
                 )
                 errors += 1
@@ -361,9 +465,20 @@ def doctor() -> None:
         try:
             from origin.infrastructure.database import ArtifactRepository
             repo = ArtifactRepository(db_path)
-            # test a query
             repo.list_decisions()
             typer.secho("[OK] SQLite workspace.db schema is readable and valid.", fg=typer.colors.GREEN)
+
+            # Check affected files staleness
+            decisions = repo.list_decisions(status="active")
+            for dec in decisions:
+                for f in dec.affected_files:
+                    full_f_path = os.path.join(root, f)
+                    if not os.path.exists(full_f_path):
+                        typer.secho(
+                            f"[WARN] Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
+                            fg=typer.colors.YELLOW,
+                        )
+                        warnings += 1
         except Exception as e:
             typer.secho(f"[FAIL] SQLite database integrity check failed: {e}", fg=typer.colors.RED)
             errors += 1
@@ -372,14 +487,91 @@ def doctor() -> None:
     git_dir = os.path.join(root, ".git")
     if not os.path.isdir(git_dir):
         typer.secho("[WARN] Workspace root is not a git repository.", fg=typer.colors.YELLOW)
+        warnings += 1
     else:
         typer.secho("[OK] Git repository detected.", fg=typer.colors.GREEN)
 
     if errors > 0:
-        typer.secho(f"\nDoctor found {errors} integrity issue(s).", fg=typer.colors.RED, bold=True)
+        typer.secho(f"\nDoctor found {errors} integrity issue(s) and {warnings} warning(s).", fg=typer.colors.RED, bold=True)
         raise typer.Exit(code=1)
     else:
-        typer.secho("\nWorkspace is healthy and ready to go!", fg=typer.colors.GREEN, bold=True)
+        if warnings > 0:
+            typer.secho(f"\nWorkspace is healthy with {warnings} warnings.", fg=typer.colors.YELLOW, bold=True)
+        else:
+            typer.secho("\nWorkspace is healthy and ready to go!", fg=typer.colors.GREEN, bold=True)
+
+
+@app.command("migrate")
+def migrate() -> None:
+    """Migrate a v1.0 SQLite-only workspace to a v2.0 filesystem-first workspace."""
+    root = find_workspace_root()
+    try:
+        use_cases.migrate_workspace(root)
+        typer.secho("Successfully migrated workspace to schema version 2.0!", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"Migration failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("connect")
+def connect(
+    target: str = typer.Argument(
+        ...,
+        help="Target editor/client to connect with (claude-code, cursor)."
+    )
+) -> None:
+    """Export context and auto-configure MCP server connection for your editor."""
+    root = find_workspace_root()
+    try:
+        export_target = "claude-code" if target == "claude-code" else "cursor"
+        dest = export_flat_file(root, export_target)
+        typer.secho(f"1. Context successfully exported to {dest}", fg=typer.colors.GREEN)
+
+        import shutil
+        mcp_bin = shutil.which("origin-mcp") or "origin-mcp"
+
+        if target == "claude-code":
+            config_path = os.path.expanduser("~/.claude.json")
+            mcp_config = {
+                "command": mcp_bin,
+                "args": []
+            }
+
+            config_data = {}
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        config_data = json.load(f)
+                except Exception:
+                    pass
+
+            if "mcpServers" not in config_data:
+                config_data["mcpServers"] = {}
+
+            config_data["mcpServers"]["origin-memory"] = mcp_config
+
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config_data, f, indent=2)
+
+            typer.secho(f"2. Auto-configured MCP server in {config_path}", fg=typer.colors.GREEN)
+            typer.secho("Ready to use! Start Claude Code and it will auto-load origin tools.", fg=typer.colors.CYAN)
+
+        elif target == "cursor":
+            cursorrules_path = os.path.join(root, ".cursorrules")
+            typer.secho("2. Cursor integration instructions:", fg=typer.colors.CYAN, bold=True)
+            typer.echo("Open Cursor -> Settings -> Features -> MCP.")
+            typer.echo("Add a new MCP server with:")
+            typer.echo("  Name: origin-memory")
+            typer.echo("  Type: command")
+            typer.echo(f"  Command: {mcp_bin}")
+            typer.secho(f"\nYour .cursorrules has been populated at {cursorrules_path}", fg=typer.colors.GREEN)
+        else:
+            typer.secho(f"Unsupported connection target: {target}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+    except Exception as e:
+        typer.secho(f"Connection failed: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command("mcp-config")
@@ -399,7 +591,7 @@ def mcp_config() -> None:
     typer.secho("\nClaude Code (~/.claude.json) or Claude Desktop Configuration:", fg=typer.colors.CYAN, bold=True)
     typer.echo(json.dumps(snippet, indent=2))
     typer.echo("\nInstructions:")
-    typer.echo("1. Ensure 'origin-cli' package is installed in your python environment (e.g. via 'pip install -e .' or 'pipx install').")
+    typer.echo("1. Ensure 'origin-cli' package is installed in your python environment.")
     typer.echo("2. Verify that 'origin-mcp' is available in your system path by running 'origin-mcp --help'.")
     typer.echo("3. If it is in a virtualenv, specify the absolute path to 'origin-mcp' in the 'command' field above.\n")
 
