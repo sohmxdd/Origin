@@ -4,7 +4,9 @@
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](pyproject.toml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**Origin** is a local-first, git-friendly persistent memory layer for AI coding agents. It solves a single core problem: every AI assistant (Claude Code, Cursor, Windsurf, etc.) begins every session with zero context about your project's architecture, historical decisions, and active conventions. Origin acts as a persistent brain, recording that knowledge as typed, versioned artifacts committed directly to your repository.
+**Origin** is a local-first, git-friendly persistent memory layer for AI coding agents. It solves a single core problem: every AI assistant — Claude Code, Cursor, Windsurf, Codex CLI, Aider, or any MCP-compatible tool — begins every session with zero context about your project's architecture, historical decisions, and active conventions. Origin acts as a persistent brain, recording that knowledge as typed, versioned artifacts committed directly to your repository.
+
+> **Works with any agent.** Origin exports context as plain Markdown files (`ORIGIN.md`, `CLAUDE.md`, `.cursorrules`) and exposes an MCP server that any compatible client can connect to. If your agent reads files or speaks MCP, it works with Origin.
 
 ---
 
@@ -17,7 +19,7 @@ graph TD
     subgraph Client ["Developer Environments & Agents"]
         CLI["origin CLI"]
         TUI["origin tui (Interactive Dashboard)"]
-        Agent["AI Agent (Claude Code, Cursor)"]
+        Agent["Any AI Agent (via MCP or file read)"]
     end
 
     subgraph OriginCore ["Origin Core Layer"]
@@ -31,10 +33,10 @@ graph TD
         Repo[".git/ (History & Sync)"]
     end
 
-    subgraph Exports ["Flat-File Context Mirroring"]
-        CLAUDE["CLAUDE.md"]
-        Cursor[".cursorrules"]
-        Generic["ORIGIN.md"]
+    subgraph Exports ["Flat-File Context (Agent-Readable)"]
+        Generic["ORIGIN.md (Universal)"]
+        CLAUDE["CLAUDE.md (Claude Code)"]
+        Cursor[".cursorrules (Cursor)"]
     end
 
     CLI --> App
@@ -43,9 +45,9 @@ graph TD
     App <--> YAML
     YAML --> DB
     App --> Mirror
+    Mirror --> Generic
     Mirror --> CLAUDE
     Mirror --> Cursor
-    Mirror --> Generic
     YAML --> Repo
 ```
 
@@ -82,9 +84,14 @@ origin decision add \
 
 ### 4. Keep Agent Context Up to Date
 ```bash
-origin export --target claude-code
+# Universal — works with any agent that reads project files
+origin export --target generic
+
+# Or target a specific editor
+origin export --target claude-code   # writes CLAUDE.md
+origin export --target cursor        # writes .cursorrules
 ```
-This appends/updates a marked context block inside `CLAUDE.md` without clobbering your existing file contents!
+This appends/updates a marked context block inside the target file without clobbering your existing contents.
 
 ---
 
@@ -148,20 +155,24 @@ python demo_tui.py
 
 ---
 
-## 🔌 Utilizing the MCP Server
+## 🔌 MCP Server (Works with Any MCP Client)
 
-Origin includes a built-in Model Context Protocol (MCP) server allowing AI agents to query and add project memory directly.
+Origin includes a built-in [Model Context Protocol](https://modelcontextprotocol.io/) server. Any MCP-compatible agent — Claude Code, Cursor, Windsurf, Codex CLI, or custom tools — can query and add project memory directly.
 
-### Quickest setup
+### Quick setup for supported editors
 ```bash
+# Claude Code — auto-writes ~/.claude.json
 origin connect claude-code
-```
-This exports context to `CLAUDE.md` and auto-configures `~/.claude.json` with the MCP server entry. For Cursor, use `origin connect cursor`.
 
-### Manual registration
+# Cursor — exports .cursorrules and prints MCP config instructions
+origin connect cursor
+```
+
+### Manual registration (any MCP client)
 ```bash
 origin mcp-config
 ```
+This prints the JSON snippet (`origin-mcp` command + args) you can paste into any MCP client's configuration.
 
 ### Available MCP Tools:
 - `origin_get_context()`: returns the compiled markdown context bundle.
