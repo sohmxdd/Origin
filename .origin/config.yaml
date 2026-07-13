@@ -1,0 +1,6 @@
+workspace_name: Origin
+schema_version: '1.0'
+agent_allowlist:
+- claude-code
+- codex-cli
+- human
