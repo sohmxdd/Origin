@@ -103,7 +103,7 @@ class MirrorWriter:
 
     def generate_context_bundle(self, decisions: List[Decision], entries: List[MemoryEntry]) -> str:
         """Compile a single prompt-friendly context bundle string."""
-        from origin.application.use_cases import compile_context_bundle
+        from origin.domain.context import compile_context_bundle
         return compile_context_bundle(
             decisions,
             entries,

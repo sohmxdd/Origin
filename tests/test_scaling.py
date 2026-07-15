@@ -3,9 +3,11 @@
 from datetime import datetime, timezone, timedelta
 import pytest
 from origin.domain.models import Decision, MemoryEntry
-from origin.application.use_cases import (
+from origin.domain.context import (
     estimate_tokens,
     compile_context_bundle,
+)
+from origin.application.use_cases import (
     check_conflicting_decisions,
 )
 
