@@ -230,6 +230,6 @@ We welcome contributions! Please review [CONTRIBUTING.md](CONTRIBUTING.md) to se
 
 ---
 
-## ❤️ Star the Repo!
+## ⭐ Star the Repo!
 
 If you find Origin helpful for pair programming with AI agents, please **star this repository** to help others discover it!
