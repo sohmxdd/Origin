@@ -420,7 +420,7 @@ def doctor(
             repo.sync_index(force=True)
 
             from origin.infrastructure.mirror import MirrorWriter
-            mirror = MirrorWriter(origin_dir, config.workspace_name, config.schema_version)
+            mirror = MirrorWriter(origin_dir, config.workspace_name, config.schema_version, token_budget=config.token_budget)
             mirror.refresh_all(repo)
 
             export_flat_file(root, "generic")
@@ -479,6 +479,16 @@ def doctor(
                             fg=typer.colors.YELLOW,
                         )
                         warnings += 1
+
+            # Check for conflicting active decisions (file overlap heuristic)
+            from origin.application.use_cases import check_conflicting_decisions
+            conflicts = check_conflicting_decisions(decisions)
+            for id1, id2, f in conflicts:
+                typer.secho(
+                    f"[WARN] Decisions {id1} and {id2} both affect {f} — review for conflicts.",
+                    fg=typer.colors.YELLOW,
+                )
+                warnings += 1
         except Exception as e:
             typer.secho(f"[FAIL] SQLite database integrity check failed: {e}", fg=typer.colors.RED)
             errors += 1

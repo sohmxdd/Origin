@@ -202,6 +202,24 @@ This prints the JSON snippet (`origin-mcp` command + args) you can paste into an
 | `origin doctor --fix` | Rebuild SQLite index from YAML files and regenerate mirrors |
 | `origin migrate` | Migrate a v1.0 workspace to v2.0 filesystem-first format |
 
+## ⚖️ Scalability & Conflict Prevention
+
+Origin is built to scale with real-world project history through two core features:
+
+### 1. Token-Budgeted Context Bundling
+To prevent your agent's context window from being overwhelmed as your workspace grows, Origin enforces a configurable token budget (defaulting to `4000` tokens, overridable in `.origin/config.yaml` via `token_budget`):
+* **Priority Sorting:** Active decisions are prioritized by:
+  1. Recency (`updated_at` descending)
+  2. Confidence (`confidence` descending)
+  3. Decision ID (alphabetical ascending for absolute tie-break determinism)
+* **Graceful Summarization:** High-priority decisions are kept in full, while older/lower-confidence decisions are summarized to a single-line reference (`- Title (id)`).
+* **Memory Preservation:** Memory entries are inherently compact and always included in full.
+* **Truncation Warning:** The bundle ends with a warning note (e.g. `12 older decisions summarized...`) when truncation occurs.
+
+### 2. Conflict Heuristics (`doctor` warnings)
+If two concurrent agents add active decisions that affect the same file without linking them via supersession, it poses a semantic integrity risk. 
+`origin doctor` (and TUI diagnostics) includes an optimized $O(N)$ conflict check that flags when two active decisions target overlapping paths in `affected_files`, reporting them as warnings so you can review and resolve them.
+
 ---
 
 ## 🤝 Contributing

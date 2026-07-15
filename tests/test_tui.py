@@ -20,9 +20,9 @@ async def test_tui_boots_and_populates(tui_workspace):
         await pilot.resize_terminal(120, 40)
         await pilot.pause()
 
-        # Check header contains workspace name
-        header = app.query_one("#header-bar", Static)
-        assert "TuiTestApp" in str(header.content)
+        # Check welcome metadata contains workspace name
+        welcome_metadata = app.query_one("#welcome-metadata", Static)
+        assert "TuiTestApp" in str(welcome_metadata.content)
 
         # Overview View diagnostics check
         diagnostics = app.query_one("#overview-diagnostics")

@@ -193,3 +193,37 @@ def test_cli_mcp_config(cli_runner: CliRunner) -> None:
     assert result.exit_code == 0
     assert "origin-mcp" in result.stdout
     assert "origin-memory" in result.stdout
+
+
+def test_cli_doctor_conflict(cli_runner: CliRunner) -> None:
+    """Verify doctor flags active decisions with overlapping affected files."""
+    cli_runner.invoke(app, ["init"])
+    
+    # Create two decisions that both affect the same file
+    cli_runner.invoke(
+        app,
+        [
+            "decision", "add",
+            "--title", "D1",
+            "--rationale", "R1",
+            "--confidence", "1.0",
+            "--alternative", "None",
+            "--file", "src/db.py",
+        ]
+    )
+    cli_runner.invoke(
+        app,
+        [
+            "decision", "add",
+            "--title", "D2",
+            "--rationale", "R2",
+            "--confidence", "1.0",
+            "--alternative", "None",
+            "--file", "src/db.py",
+        ]
+    )
+    
+    # Run doctor check
+    result = cli_runner.invoke(app, ["doctor"])
+    assert "both affect src/db.py" in result.stdout
+    assert "Workspace is healthy and ready to go!" not in result.stdout

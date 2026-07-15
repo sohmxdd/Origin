@@ -14,17 +14,19 @@ from origin.infrastructure.database import ArtifactRepository
 class MirrorWriter:
     """Class responsible for generating Markdown files from repository state."""
 
-    def __init__(self, origin_dir: str, workspace_name: str, schema_version: str) -> None:
+    def __init__(self, origin_dir: str, workspace_name: str, schema_version: str, token_budget: int = 4000) -> None:
         """Initialize the MirrorWriter.
 
         Args:
             origin_dir: Absolute path to the .origin folder.
             workspace_name: Name of the current workspace.
             schema_version: Schema version of the workspace format.
+            token_budget: Token budget limit.
         """
         self.origin_dir = os.path.abspath(origin_dir)
         self.workspace_name = workspace_name
         self.schema_version = schema_version
+        self.token_budget = token_budget
 
     def generate_decisions_md(self, decisions: List[Decision]) -> str:
         """Format active decisions into a structured markdown string."""
@@ -101,46 +103,14 @@ class MirrorWriter:
 
     def generate_context_bundle(self, decisions: List[Decision], entries: List[MemoryEntry]) -> str:
         """Compile a single prompt-friendly context bundle string."""
-        content = [
-            "# Origin Project Context\n",
-            "This is the active project memory and decision history. Use this context to align with architecture and decisions.\n",
-            "## Workspace Information",
-            f"- **Workspace Name:** {self.workspace_name}",
-            f"- **Schema Version:** {self.schema_version}\n",
-            "## Active Decisions\n",
-        ]
-
-        if not decisions:
-            content.append("No active decisions recorded yet.\n")
-        else:
-            for dec in decisions:
-                updated_str = dec.updated_at.strftime("%Y-%m-%d %H:%M:%S UTC")
-                content.append(f"### {dec.title} (`{dec.id}`)")
-                content.append(f"- **Confidence:** {dec.confidence:.2f} | **Agent:** {dec.originating_agent} | **Updated:** {updated_str}")
-                content.append(f"- **Rationale:** {dec.rationale.strip()}")
-                if dec.alternatives_considered:
-                    alts_str = ", ".join(dec.alternatives_considered)
-                    content.append(f"- **Alternatives Considered:** {alts_str}")
-                if dec.affected_files:
-                    files_str = ", ".join(f"`{f}`" for f in dec.affected_files)
-                    content.append(f"- **Affected Files:** {files_str}")
-                content.append("")
-
-        content.append("## Active Project Memory\n")
-        if not entries:
-            content.append("No active memory entries recorded yet.\n")
-        else:
-            categories = ["architecture", "convention", "tech_stack", "glossary", "deployment"]
-            for cat in categories:
-                cat_entries = [e for e in entries if e.category == cat]
-                if not cat_entries:
-                    continue
-                content.append(f"### {cat.replace('_', ' ').title()}")
-                for entry in cat_entries:
-                    content.append(f"- **{entry.key}**: {entry.value}")
-                content.append("")
-
-        return "\n".join(content)
+        from origin.application.use_cases import compile_context_bundle
+        return compile_context_bundle(
+            decisions,
+            entries,
+            self.workspace_name,
+            self.schema_version,
+            self.token_budget,
+        )
 
     def refresh_all(self, repo: ArtifactRepository) -> None:
         """Query active entries and write all mirrors to the .origin folder.

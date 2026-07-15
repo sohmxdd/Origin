@@ -28,7 +28,12 @@ def _get_infra(workspace_root: str) -> tuple[ArtifactRepository, MirrorWriter, G
     db_path = os.path.join(origin_dir, "workspace.db")
     
     repo = ArtifactRepository(db_path)
-    mirror = MirrorWriter(origin_dir, config.workspace_name, config.schema_version)
+    mirror = MirrorWriter(
+        origin_dir,
+        config.workspace_name,
+        config.schema_version,
+        token_budget=config.token_budget,
+    )
     git = GitHelper(workspace_root)
     
     return repo, mirror, git
@@ -70,7 +75,7 @@ def init_workspace(workspace_root: str, workspace_name: str, with_hooks: bool) -
         git.install_hooks()
 
     # Initial mirror refresh
-    mirror = MirrorWriter(origin_dir, workspace_name, config.schema_version)
+    mirror = MirrorWriter(origin_dir, workspace_name, config.schema_version, token_budget=config.token_budget)
     mirror.refresh_all(repo)
 
 
@@ -325,9 +330,16 @@ def get_context_bundle(workspace_root: str) -> str:
         A Markdown formatted context bundle string.
     """
     repo, mirror, _ = _get_infra(workspace_root)
+    config = load_config(workspace_root)
     decisions = repo.list_decisions(status="active")
     memories = repo.list_memory()
-    return mirror.generate_context_bundle(decisions, memories)
+    return compile_context_bundle(
+        decisions,
+        memories,
+        config.workspace_name,
+        config.schema_version,
+        config.token_budget,
+    )
 
 
 def accept_decision(workspace_root: str, decision_id: str, agent: str) -> Decision:
@@ -516,7 +528,7 @@ def migrate_workspace(workspace_root: str) -> None:
     save_config(workspace_root, config)
 
     repo.sync_index(force=True)
-    mirror = MirrorWriter(origin_dir, config.workspace_name, "2.0")
+    mirror = MirrorWriter(origin_dir, config.workspace_name, "2.0", token_budget=config.token_budget)
     mirror.refresh_all(repo)
 
 
@@ -642,3 +654,166 @@ def import_conventions(workspace_root: str) -> List[dict]:
             deduped.append(s)
 
     return deduped
+
+
+def estimate_tokens(text: str) -> int:
+    """Approximate LLM token count using a character-count heuristic.
+    
+    We assume 1 token ≈ 4 characters, which is a standard approximation
+    for English and programming source code.
+    """
+    return len(text) // 4
+
+
+def compile_context_bundle(
+    decisions: List[Decision],
+    memories: List[MemoryEntry],
+    workspace_name: str,
+    schema_version: str,
+    token_budget: int,
+) -> str:
+    """Compile active decisions and memories into a budget-aware Markdown string.
+    
+    If the full representation exceeds the token_budget, decisions are selected for full
+    rendering using the following sorting hierarchy:
+      1. Primary: Recency (updated_at timestamp descending, newest first)
+      2. Secondary: Confidence (confidence value descending, highest first)
+      3. Tertiary: Decision ID (alphabetical ascending, for determinism)
+      
+    Older/lower-priority decisions are compressed to a single-line reference title and ID.
+    Memory entries are always rendered in full.
+    
+    Args:
+        decisions: List of active Decision objects.
+        memories: List of active MemoryEntry objects.
+        workspace_name: Name of the Origin workspace.
+        schema_version: Workspace schema version.
+        token_budget: Character-based token budget limit.
+        
+    Returns:
+        Markdown context bundle string.
+    """
+    # Sort active decisions by priority: recency desc, confidence desc, id asc
+    decisions_sorted = sorted(
+        decisions,
+        key=lambda d: (
+            -d.updated_at.timestamp() if d.updated_at else 0.0,
+            -d.confidence if d.confidence is not None else 0.0,
+            d.id if d.id else ""
+        )
+    )
+
+    promoted_indices = set()
+    
+    # Helper to construct the markdown bundle given a set of promoted indices
+    def _format_bundle(promoted: set[int]) -> str:
+        content = [
+            "# Origin Project Context\n",
+            "This is the active project memory and decision history. Use this context to align with architecture and decisions.\n",
+            "## Workspace Information",
+            f"- **Workspace Name:** {workspace_name}",
+            f"- **Schema Version:** {schema_version}\n",
+            "## Active Decisions\n",
+        ]
+        
+        if not decisions_sorted:
+            content.append("No active decisions recorded yet.\n")
+        else:
+            full_decs = [decisions_sorted[i] for i in range(len(decisions_sorted)) if i in promoted]
+            sum_decs = [decisions_sorted[i] for i in range(len(decisions_sorted)) if i not in promoted]
+            
+            if full_decs:
+                # Retain the relative priority order for the full decisions list
+                for dec in full_decs:
+                    updated_str = dec.updated_at.strftime("%Y-%m-%d %H:%M:%S UTC") if dec.updated_at else "N/A"
+                    content.append(f"### {dec.title} (`{dec.id}`)")
+                    content.append(f"- **Confidence:** {dec.confidence:.2f} | **Agent:** {dec.originating_agent} | **Updated:** {updated_str}")
+                    content.append(f"- **Rationale:** {dec.rationale.strip()}")
+                    if dec.alternatives_considered:
+                         alts_str = ", ".join(dec.alternatives_considered)
+                         content.append(f"- **Alternatives Considered:** {alts_str}")
+                    if dec.affected_files:
+                         files_str = ", ".join(f"`{f}`" for f in dec.affected_files)
+                         content.append(f"- **Affected Files:** {files_str}")
+                    content.append("")
+            
+            if sum_decs:
+                content.append("### Other Active Decisions (Summarized)\n")
+                for dec in sum_decs:
+                    content.append(f"- {dec.title} (`{dec.id}`)")
+                content.append("")
+                
+        content.append("## Active Project Memory\n")
+        if not memories:
+            content.append("No active memory entries recorded yet.\n")
+        else:
+            categories = ["architecture", "convention", "tech_stack", "glossary", "deployment"]
+            for cat in categories:
+                cat_entries = [e for e in memories if e.category == cat]
+                if not cat_entries:
+                    continue
+                content.append(f"### {cat.replace('_', ' ').title()}")
+                for entry in cat_entries:
+                    content.append(f"- **{entry.key}**: {entry.value}")
+                content.append("")
+                
+        # Append truncation note if there are summarized decisions
+        num_summarized = len(decisions_sorted) - len(promoted)
+        if num_summarized > 0:
+            content.append(f"\n{num_summarized} older decisions summarized — use origin search or origin decision list for full detail")
+            
+        return "\n".join(content)
+
+    # Greedily promote decisions in priority order as long as the estimated token budget allows
+    for i in range(len(decisions_sorted)):
+        test_promoted = promoted_indices | {i}
+        test_bundle = _format_bundle(test_promoted)
+        if estimate_tokens(test_bundle) <= token_budget:
+            promoted_indices.add(i)
+        else:
+            # Once we exceed the budget, stop promoting to respect strict priority
+            break
+            
+    return _format_bundle(promoted_indices)
+
+
+def check_conflicting_decisions(decisions: List[Decision]) -> List[tuple[str, str, str]]:
+    """Check for active decisions with overlapping affected files.
+    
+    This is explicitly a cheap heuristic based on file-overlap, not decision content.
+    It does not attempt real semantic conflict detection (e.g. via an LLM call).
+    This is a potential direction for future enhancements.
+    
+    Args:
+        decisions: List of active Decision objects.
+        
+    Returns:
+        List of sorted tuples (dec1_id, dec2_id, overlapping_file_path).
+    """
+    active_decs = [d for d in decisions if d.status == "active"]
+    
+    # Map file path -> list of decisions affecting it
+    file_to_decisions = {}
+    for dec in active_decs:
+        for f in dec.affected_files:
+            file_to_decisions.setdefault(f, []).append(dec)
+            
+    conflicts = []
+    for f, decs in file_to_decisions.items():
+        if len(decs) > 1:
+            # Find all unique pairs of decisions sharing this file
+            for i in range(len(decs)):
+                for j in range(i + 1, len(decs)):
+                    dec1 = decs[i]
+                    dec2 = decs[j]
+                    
+                    # Skip pairs where one decision has superseded the other
+                    if dec1.superseded_by == dec2.id or dec2.superseded_by == dec1.id:
+                        continue
+                        
+                    # Maintain alphabetical order of decision IDs for determinism
+                    id1, id2 = sorted([dec1.id, dec2.id])
+                    conflicts.append((id1, id2, f))
+                    
+    # Return sorted, unique conflict list
+    return sorted(list(set(conflicts)))

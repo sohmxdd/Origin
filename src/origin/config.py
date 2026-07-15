@@ -20,6 +20,7 @@ class WorkspaceConfig(BaseModel):
         default_factory=lambda: ["claude-code", "codex-cli", "human"],
         description="Allowlist of agents that can write artifacts",
     )
+    token_budget: int = Field(default=4000, description="Token budget for context bundling")
 
 
 def get_origin_dir(workspace_root: str) -> str:

@@ -294,10 +294,7 @@ class HeaderBar(Static):
 
 
 # ── Welcome Screen (Claude Code Style) ──────────────────────
-WELCOME_TITLE_MARKUP = """[bold white]Welcome back to[/]
-[bold #00ffd2] ▄██▄  ████▄  ██  ▄████  ██  ███ █[/]
-[bold #00ffd2]██  ██ ██▄██  ██ ██  ▄▄  ██  █████[/]
-[bold #00ffd2] ▀██▀  ██ ▀▄  ██  ▀████  ██  ██ ██[/]"""
+WELCOME_TITLE_MARKUP = "[bold white]Welcome back to[/] [bold #00ffd2]ORIGIN[/]"
 
 
 class WelcomeCard(Container):
@@ -412,6 +409,13 @@ class HomeView(VerticalScroll):
                         if not os.path.exists(os.path.join(root, f)):
                             results.append(f"[#e2a855][WARN][/] Stale file reference: Decision '{dec.id[:8]}' affects '{f}' which does not exist.")
                             warnings += 1
+
+                # Check for conflicting active decisions (file overlap heuristic)
+                from origin.application.use_cases import check_conflicting_decisions
+                conflicts = check_conflicting_decisions(decisions)
+                for id1, id2, f in conflicts:
+                    results.append(f"[#e2a855][WARN][/] Decisions {id1[:8]} and {id2[:8]} both affect '{f}' — review for conflicts.")
+                    warnings += 1
             except Exception as e:
                 results.append(f"[#e25555][FAIL][/] workspace.db read error: {e}")
                 errors += 1
