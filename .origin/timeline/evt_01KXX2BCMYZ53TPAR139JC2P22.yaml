@@ -1,0 +1,11 @@
+id: evt_01KXX2BCMYZ53TPAR139JC2P22
+type: timeline_event
+created_at: '2026-07-19T11:31:58.750507Z'
+updated_at: '2026-07-19T11:31:58.750507Z'
+originating_agent: human
+status: active
+superseded_by: null
+event_type: decision_created
+ref_artifact_id: dec_01KXX2BCK9WX53SD5A6SKWJYKK
+commit_sha: 0981bb598c4c9a2c2aa7ed8b427a3c7c43a00518
+summary: 'Decision proposed: ''Test PR Comment Workflow'''

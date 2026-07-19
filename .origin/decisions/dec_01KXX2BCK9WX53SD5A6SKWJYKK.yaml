@@ -1,0 +1,13 @@
+id: dec_01KXX2BCK9WX53SD5A6SKWJYKK
+type: decision
+created_at: '2026-07-19T11:31:58.697211Z'
+updated_at: '2026-07-19T11:31:58.697211Z'
+originating_agent: human
+status: proposed
+superseded_by: null
+title: Test PR Comment Workflow
+rationale: Verify that commenting on PR successfully triggers the Action to accept
+  this decision.
+alternatives_considered: []
+affected_files: []
+confidence: 1.0
