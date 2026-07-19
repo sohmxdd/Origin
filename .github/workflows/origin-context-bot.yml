@@ -1,0 +1,145 @@
+name: Origin Proactive PR Context Bot
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  context_bot:
+    name: Proactive Architecture Context
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout Default Branch (Trusted Code)
+        uses: actions/checkout@v4
+        with:
+          path: trusted-origin
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Origin (from Trusted Source)
+        run: |
+          pip install ./trusted-origin
+
+      - name: Process PR Files and Post Context
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          HEAD_REPO_FULLNAME: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: python
+        run: |
+          import json
+          import os
+          import subprocess
+          import urllib.request
+          import urllib.error
+
+          pr_number = os.environ.get("PR_NUMBER")
+          repo = os.environ.get("REPO")
+          head_repo_fullname = os.environ.get("HEAD_REPO_FULLNAME")
+          head_sha = os.environ.get("HEAD_SHA")
+          token = os.environ.get("GITHUB_TOKEN")
+
+          headers = {
+              "Authorization": f"token {token}",
+              "Accept": "application/vnd.github+json"
+          }
+
+          # 1. Checkout the exact commit SHA from the PR's repository to pr-data
+          print(f"Cloning PR head repository {head_repo_fullname}...")
+          subprocess.run(["git", "clone", f"https://github.com/{head_repo_fullname}.git", "pr-data"], check=True)
+          print(f"Checking out PR head commit SHA {head_sha}...")
+          subprocess.run(["git", "checkout", head_sha], cwd="pr-data", check=True)
+
+          # 2. Paginate through changed files in the PR via GitHub API
+          print("Retrieving list of changed files in the PR...")
+          changed_files = []
+          page = 1
+          while True:
+              url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/files?per_page=100&page={page}"
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      files_data = json.loads(resp.read().decode("utf-8"))
+                      if not files_data:
+                          break
+                      for f in files_data:
+                          changed_files.append(f["filename"])
+                      if len(files_data) < 100:
+                          break
+                      page += 1
+              except Exception as e:
+                  print(f"Failed to fetch changed files page {page}: {e}")
+                  break
+
+          print(f"Found {len(changed_files)} changed file(s) in this PR.")
+
+          # 3. Query get_decisions_affecting_file for each modified file
+          from origin.application.use_cases import get_decisions_affecting_file
+          
+          matched_decisions = {}
+          for filename in changed_files:
+              try:
+                  # Use safe python function directly (immune to command/shell injection)
+                  decs = get_decisions_affecting_file("pr-data", filename)
+                  for d in decs:
+                      matched_decisions[d.id] = d
+              except Exception as e:
+                  print(f"Error querying blame for file {filename}: {e}")
+
+          # 4. Generate context comment if decisions were found
+          marker = "<!-- origin-context-bot-marker -->"
+          if matched_decisions:
+              comment_body = f"{marker}\n### ⚛️ Origin Architecture Context\n\n"
+              comment_body += f"This PR touches code governed by {len(matched_decisions)} existing decision(s):\n\n"
+              
+              # Sort decisions chronologically for consistent layout
+              sorted_decs = sorted(matched_decisions.values(), key=lambda d: d.created_at)
+              for d in sorted_decs:
+                  status_lbl = "ACTIVE" if d.status == "active" else d.status.upper()
+                  comment_body += f"* **`{d.id}`** - **{d.title}** (`[{status_lbl}]`)\n"
+                  comment_body += f"  > *Rationale:* {d.rationale}\n"
+                  
+              # Post or update PR comment
+              comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
+              existing_comment_id = None
+              try:
+                  req = urllib.request.Request(comments_url, headers=headers)
+                  with urllib.request.urlopen(req) as resp:
+                      comments = json.loads(resp.read().decode("utf-8"))
+                      for c in comments:
+                          if marker in c.get("body", ""):
+                              existing_comment_id = c["id"]
+                              break
+              except Exception as e:
+                  print(f"Failed to fetch comments: {e}")
+
+              data = json.dumps({"body": comment_body}).encode("utf-8")
+              if existing_comment_id:
+                  # Update
+                  patch_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_comment_id}"
+                  req = urllib.request.Request(patch_url, data=data, headers=headers, method="PATCH")
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Updated existing context comment.")
+                  except Exception as e:
+                      print(f"Failed to update comment: {e}")
+              else:
+                  # Create
+                  req = urllib.request.Request(comments_url, data=data, headers=headers, method="POST")
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Created new context comment.")
+                  except Exception as e:
+                      print(f"Failed to post comment: {e}")
+          else:
+              print("No governed files were modified. Skipping context comment.")

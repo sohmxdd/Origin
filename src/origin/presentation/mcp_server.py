@@ -273,6 +273,70 @@ def origin_search(query: str) -> str:
         return f"Error performing search: {e}"
 
 
+@mcp.tool()
+def origin_blame(file_path: str) -> str:
+    """Retrieve the chronological decision history affecting a specific file.
+
+    Args:
+        file_path: The file path to blame (relative or absolute).
+
+    Returns:
+        A Markdown-formatted string detailing all decisions affecting the file.
+    """
+    root = find_workspace_root()
+    try:
+        decisions = use_cases.get_decisions_affecting_file(root, file_path)
+        if not decisions:
+            return f"No recorded decisions affect file '{file_path}'."
+
+        lines = [
+            f"# Origin Blame: `{file_path}`",
+            f"Found {len(decisions)} decision(s) affecting this file.",
+            "",
+        ]
+
+        # Use ArtifactRepository for supersession lookups
+        origin_dir = os.path.join(root, ".origin")
+        from origin.infrastructure.database import ArtifactRepository
+        repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
+
+        for i, dec in enumerate(decisions):
+            # Status string
+            if dec.status == "active":
+                status_str = "**ACTIVE**"
+            elif dec.status == "proposed":
+                status_str = "**PROPOSED - Pending Review**"
+            elif dec.status == "superseded":
+                status_str = "**SUPERSEDED**"
+            elif dec.status == "rejected":
+                status_str = "**REJECTED**"
+            else:
+                status_str = f"**{dec.status.upper()}**"
+
+            chain_info = ""
+            if dec.status == "superseded" and dec.superseded_by:
+                sup_dec = repo.get(dec.superseded_by)
+                sup_title = f"'{sup_dec.title}'" if sup_dec else "Unknown"
+                chain_info = f"\n  * ↳ Superseded by: `{dec.superseded_by}` ({sup_title})"
+
+            lines.append(f"## [{i+1}/{len(decisions)}] Decision `{dec.id}`")
+            lines.append(f"* **Title:** {dec.title}")
+            lines.append(f"* **Status:** {status_str}{chain_info}")
+            lines.append(f"* **Timestamp:** {dec.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            lines.append(f"* **Confidence:** {dec.confidence:.2f}")
+            lines.append(f"* **Rationale:** {dec.rationale}")
+            if dec.alternatives_considered:
+                lines.append(f"* **Alternatives:** {', '.join(dec.alternatives_considered)}")
+            lines.append("")
+
+        return "\n".join(lines).strip()
+    except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
+        return f"Error executing blame: {e}"
+
+
 def main() -> None:
     """Main CLI entrypoint for origin-mcp script. Runs the FastMCP server on stdio transport."""
     mcp.run(transport="stdio")

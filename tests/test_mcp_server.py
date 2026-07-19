@@ -352,7 +352,32 @@ async def test_mcp_secrets_guard_blocking(mcp_workspace: str) -> None:
     # Check that it returns a clean error string back to client instead of throwing or hanging
     assert "Error adding decision: Write rejected: content appears to contain a credential pattern" in content_blocks[0].text
     assert "(AWS Access Key ID)" in content_blocks[0].text
+@pytest.mark.asyncio
+async def test_mcp_blame(mcp_workspace: str) -> None:
+    """Verify that origin_blame tool works correctly and returns Markdown formatted trace."""
+    # 1. Propose decision affecting a file
+    await mcp.call_tool(
+        "origin_add_decision",
+        arguments={
+            "title": "Use SQL Database",
+            "rationale": "For structured storage",
+            "affected_files": ["db.py"],
+        },
+    )
 
-
-
+    # 2. Call blame tool
+    response = await mcp.call_tool(
+        "origin_blame",
+        arguments={
+            "file_path": "db.py"
+        },
+    )
+    content_blocks = response[0]
+    assert len(content_blocks) == 1
+    text = content_blocks[0].text
+    assert "# Origin Blame: `db.py`" in text
+    assert "Decision" in text
+    assert "dec_" in text
+    assert "Use SQL Database" in text
+    assert "ACTIVE" in text
 

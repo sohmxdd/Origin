@@ -24,6 +24,7 @@ dependencies = [
     "mcp>=1.0.0",
     "rich>=13.0",
     "textual>=0.50",
+    "jinja2",
 ]
 
 [project.optional-dependencies]

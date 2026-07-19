@@ -399,6 +399,66 @@ def export(
         raise typer.Exit(code=1)
 
 
+@app.command("blame")
+def blame(
+    file_path: str = typer.Argument(..., help="Path of the file to blame.")
+) -> None:
+    """Show the chronological decision history affecting a specific file."""
+    root = find_workspace_root()
+    try:
+        decisions = use_cases.get_decisions_affecting_file(root, file_path)
+        if not decisions:
+            typer.secho(f"No recorded decisions affect file '{file_path}'.", fg=typer.colors.YELLOW)
+            return
+
+        from rich.console import Console
+        console = Console()
+
+        console.print(f"[bold cyan]Origin Blame:[/] [white]{file_path}[/]")
+        console.print(f"Found {len(decisions)} decision(s) affecting this file.\n")
+
+        # Query repo for status/supersession link lookups
+        origin_dir = os.path.join(root, ".origin")
+        from origin.infrastructure.database import ArtifactRepository
+        repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
+
+        for i, dec in enumerate(decisions):
+            # Status colors & string format
+            if dec.status == "active":
+                status_str = "[bold green]ACTIVE[/]"
+            elif dec.status == "proposed":
+                status_str = "[bold yellow]PROPOSED - Pending Review[/]"
+            elif dec.status == "superseded":
+                status_str = "[bold red]SUPERSEDED[/]"
+            elif dec.status == "rejected":
+                status_str = "[bold red]REJECTED[/]"
+            else:
+                status_str = f"[bold white]{dec.status.upper()}[/]"
+
+            chain_info = ""
+            if dec.status == "superseded" and dec.superseded_by:
+                sup_dec = repo.get(dec.superseded_by)
+                sup_title = f"'{sup_dec.title}'" if sup_dec else "Unknown"
+                chain_info = f"\n    [bold red]↳ Superseded by:[/] {dec.superseded_by} ({sup_title})"
+
+            # Render thin visual divider/whitespace layout
+            console.print(f"[cyan]─[/]" * 60)
+            console.print(f"[cyan bold]Decision:[/] {dec.id} ([cyan]{i+1}/{len(decisions)}[/])")
+            console.print(f"  [bold]Title:[/] {dec.title}")
+            console.print(f"  [bold]Status:[/] {status_str}{chain_info}")
+            console.print(f"  [bold]Timestamp:[/] {dec.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            console.print(f"  [bold]Confidence:[/] {dec.confidence:.2f}")
+            console.print(f"  [bold]Rationale:[/] {dec.rationale}")
+            if dec.alternatives_considered:
+                console.print(f"  [bold]Alternatives:[/] {', '.join(dec.alternatives_considered)}")
+        
+        console.print(f"[cyan]─[/]" * 60)
+        
+    except Exception as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
 @app.command("doctor")
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Automatically repair index drift and refresh mirrors."),
@@ -716,6 +776,171 @@ def tui() -> None:
 
     from origin.presentation.tui import run_tui
     run_tui(workspace_root=root)
+
+
+@app.command("build-site")
+def build_site(
+    output: str = typer.Option("site", "--output", "-o", help="Target output directory for the static site.")
+) -> None:
+    """Build a browsable static HTML site and Shields.io status badge from workspace records."""
+    root = find_workspace_root()
+    origin_dir = os.path.join(root, ".origin")
+    if not os.path.isdir(origin_dir):
+        typer.secho("Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    try:
+        import jinja2
+    except ImportError:
+        typer.secho("Error: 'jinja2' is required to run build-site. Please run 'pip install jinja2'.", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    try:
+        # Load config & repo
+        config = use_cases.load_config(root)
+        from origin.infrastructure.database import ArtifactRepository
+        repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
+        repo.sync_index()
+
+        # Load all records
+        all_decisions = repo.list_decisions()
+        all_memories = repo.list_memory()
+        all_timeline = repo.list_timeline()
+
+        # Ensure output directory structures exist
+        output_dir = os.path.abspath(output)
+        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(os.path.join(output_dir, "decisions"), exist_ok=True)
+
+        # Setup Jinja2 environment
+        package_dir = os.path.dirname(os.path.dirname(__file__))
+        templates_dir = os.path.join(package_dir, "templates")
+        
+        # Check if templates directory exists
+        if not os.path.isdir(templates_dir):
+            typer.secho(f"Error: Templates directory '{templates_dir}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(templates_dir))
+
+        # Calculate counts
+        counts = {
+            "active": len([d for d in all_decisions if d.status == "active"]),
+            "proposed": len([d for d in all_decisions if d.status == "proposed"]),
+            "superseded": len([d for d in all_decisions if d.status in ("superseded", "rejected")]),
+            "memory": len(all_memories),
+        }
+
+        # Calculate health warnings
+        conflicts = use_cases.check_conflicting_decisions(all_decisions)
+        warnings_list = []
+        if conflicts:
+            warnings_list.append(f"Found {len(conflicts)} file conflict(s) between active decisions.")
+        for d in all_decisions:
+            if getattr(d, "warnings", None):
+                warnings_list.extend(d.warnings)
+
+        health_status = "Healthy" if not warnings_list else "Warnings"
+
+        # Group decisions for overview list
+        active_decisions = [d for d in all_decisions if d.status == "active"]
+        proposed_decisions = [d for d in all_decisions if d.status == "proposed"]
+        history_decisions = [d for d in all_decisions if d.status in ("superseded", "rejected")]
+
+        # Group memory entries
+        memory_entries = {}
+        for m in all_memories:
+            memory_entries.setdefault(m.category, []).append(m)
+
+        # 1. Render index.html
+        index_template = env.get_template("index.html")
+        index_html = index_template.render(
+            workspace_name=config.workspace_name,
+            current_page="index",
+            relative_path="",
+            health_status=health_status,
+            num_warnings=len(warnings_list),
+            num_errors=0,
+            counts=counts,
+            timeline_events=all_timeline[-5:][::-1],
+        )
+        with open(os.path.join(output_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(index_html)
+
+        # 2. Render decisions.html
+        decisions_template = env.get_template("decisions.html")
+        decisions_html = decisions_template.render(
+            workspace_name=config.workspace_name,
+            current_page="decisions",
+            relative_path="",
+            active_decisions=active_decisions,
+            proposed_decisions=proposed_decisions,
+            history_decisions=history_decisions,
+        )
+        with open(os.path.join(output_dir, "decisions.html"), "w", encoding="utf-8") as f:
+            f.write(decisions_html)
+
+        # 3. Render decisions/{id}.html for each decision
+        detail_template = env.get_template("decision_detail.html")
+        for d in all_decisions:
+            superseding_title = None
+            if d.status == "superseded" and d.superseded_by:
+                sup_dec = repo.get(d.superseded_by)
+                if sup_dec:
+                    superseding_title = sup_dec.title
+
+            superseded_decisions = [
+                sd for sd in all_decisions if sd.superseded_by == d.id
+            ]
+
+            detail_html = detail_template.render(
+                workspace_name=config.workspace_name,
+                current_page="decisions",
+                relative_path="../",
+                decision=d,
+                superseding_title=superseding_title,
+                superseded_decisions=superseded_decisions,
+            )
+            with open(os.path.join(output_dir, "decisions", f"{d.id}.html"), "w", encoding="utf-8") as f:
+                f.write(detail_html)
+
+        # 4. Render knowledge.html
+        knowledge_template = env.get_template("knowledge.html")
+        knowledge_html = knowledge_template.render(
+            workspace_name=config.workspace_name,
+            current_page="knowledge",
+            relative_path="",
+            memory_entries=memory_entries,
+        )
+        with open(os.path.join(output_dir, "knowledge.html"), "w", encoding="utf-8") as f:
+            f.write(knowledge_html)
+
+        # 5. Render timeline.html
+        timeline_template = env.get_template("timeline.html")
+        timeline_html = timeline_template.render(
+            workspace_name=config.workspace_name,
+            current_page="timeline",
+            relative_path="",
+            timeline_events=all_timeline[::-1],
+        )
+        with open(os.path.join(output_dir, "timeline.html"), "w", encoding="utf-8") as f:
+            f.write(timeline_html)
+
+        # 6. Render badge.json (Shields.io endpoint badge format)
+        badge_data = {
+            "schemaVersion": 1,
+            "label": "Origin",
+            "message": f"{counts['active']} active | {health_status}",
+            "color": "brightgreen" if health_status == "Healthy" else "yellow",
+        }
+        with open(os.path.join(output_dir, "badge.json"), "w", encoding="utf-8") as f:
+            json.dump(badge_data, f, indent=2)
+
+        typer.secho(f"Successfully generated static site and badge at '{output_dir}'.", fg=typer.colors.GREEN)
+
+    except Exception as e:
+        typer.secho(f"Error building static site: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 
 def main() -> None:

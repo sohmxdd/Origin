@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Project Activity Timeline</h2>
+    </div>
+    <p style="color: #8b949e; margin-bottom: 2rem;">A chronological log of all architectural changes, decisions created/superseded, and modifications made within this workspace.</p>
+
+    {% if not timeline_events %}
+        <p style="padding: 2rem 0; color: #8b949e; text-align: center;">No activity recorded in the timeline.</p>
+    {% else %}
+        <div style="position: relative; padding-left: 2rem; margin-left: 1rem; border-left: 2px solid var(--border-color);">
+            {% for evt in timeline_events %}
+                <div style="margin-bottom: 2.5rem; position: relative;">
+                    <!-- Timeline Node Indicator -->
+                    <div style="position: absolute; left: -2.4rem; top: 0.25rem; width: 10px; height: 10px; border-radius: 50%; background-color: {% if evt.event_type == 'decision_created' %}var(--accent-green){% elif evt.event_type == 'decision_superseded' %}var(--accent-red){% else %}var(--accent-cyan){% endif %}; border: 3px solid var(--bg-color);"></div>
+                    
+                    <div style="background-color: var(--container-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; border-bottom: 1px solid var(--divider-color); padding-bottom: 0.5rem;">
+                            <span style="font-weight: bold; color: var(--text-bright); font-size: 1.05rem;">{{ evt.summary }}</span>
+                            <span style="font-size: 0.85rem; color: #8b949e;">{{ evt.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: #8b949e;">
+                            <div>
+                                <span>Agent:</span> <strong style="color: var(--text-color);">{{ evt.originating_agent }}</strong>
+                            </div>
+                            {% if evt.ref_artifact_id %}
+                                <div>
+                                    <span>Ref:</span> 
+                                    {% if evt.ref_artifact_id.startswith('dec_') %}
+                                        <a href="decisions/{{ evt.ref_artifact_id }}.html" style="font-family: monospace; font-weight: bold;">{{ evt.ref_artifact_id }}</a>
+                                    {% else %}
+                                        <strong style="font-family: monospace;">{{ evt.ref_artifact_id }}</strong>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            {% if evt.commit_sha %}
+                                <div>
+                                    <span>Commit:</span> <strong style="font-family: monospace;">{{ evt.commit_sha[:8] }}</strong>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

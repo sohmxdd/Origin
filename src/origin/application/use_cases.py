@@ -736,3 +736,52 @@ def check_conflicting_decisions(decisions: List[Decision]) -> List[tuple[str, st
                     
     # Return sorted, unique conflict list
     return sorted(list(set(conflicts)))
+
+
+def get_decisions_affecting_file(workspace_root: str, file_path: str) -> List[Decision]:
+    """Query the repository for any decision (active, proposed, superseded, or rejected)
+    whose affected_files contains a match for the given path.
+
+    Args:
+        workspace_root: Path to the workspace root directory.
+        file_path: The file path to query.
+
+    Returns:
+        A list of Decision objects, sorted chronologically (oldest first).
+    """
+    repo = ArtifactRepository(os.path.join(get_origin_dir(workspace_root), "workspace.db"))
+    
+    # 1. Normalize workspace root path
+    abs_root = os.path.abspath(workspace_root)
+    
+    # 2. Resolve target path
+    # If the path is absolute, resolve it directly.
+    # Otherwise, resolve it relative to current working directory.
+    # If it falls outside the workspace root, resolve it relative to the workspace root instead.
+    abs_path = os.path.abspath(file_path)
+    if not abs_path.startswith(abs_root):
+        abs_path = os.path.abspath(os.path.join(abs_root, file_path))
+        
+    # Get relative path from workspace root
+    try:
+        rel_path = os.path.relpath(abs_path, abs_root)
+    except Exception:
+        rel_path = file_path
+        
+    # Canonicalize separators to forward slashes and strip leading/trailing slashes
+    canonical_target = rel_path.replace("\\", "/").strip("/")
+
+    # Query all decisions (regardless of status)
+    all_decisions = repo.list_decisions(status=None)
+    matching_decisions = []
+    
+    for dec in all_decisions:
+        for f in dec.affected_files:
+            # Normalize affected file path
+            f_norm = f.replace("\\", "/").strip("/")
+            if f_norm == canonical_target:
+                matching_decisions.append(dec)
+                break
+                
+    return matching_decisions
+

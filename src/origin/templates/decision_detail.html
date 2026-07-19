@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p><a href="../decisions.html">&larr; Back to Decisions Log</a></p>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">{{ decision.title }}</h2>
+        <span class="badge {% if decision.status == 'active' %}badge-active{% elif decision.status == 'proposed' %}badge-proposed{% else %}badge-superseded{% endif %}">
+            {{ decision.status }}
+        </span>
+    </div>
+
+    {% if decision.status == 'superseded' and decision.superseded_by %}
+        <div style="background-color: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 1.25rem;">⚠️</span>
+            <span>This decision was superseded by <strong><a href="{{ decision.superseded_by }}.html">{{ decision.superseded_by }}{% if superseding_title %} - {{ superseding_title }}{% endif %}</a></strong>.</span>
+        </div>
+    {% endif %}
+
+    {% if superseded_decisions %}
+        <div style="background-color: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
+            <span style="font-size: 1.25rem; vertical-align: middle; margin-right: 0.5rem;">🔄</span>
+            <span style="vertical-align: middle;">This decision supersedes the following previous decision(s):</span>
+            <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
+                {% for sd in superseded_decisions %}
+                    <li><a href="{{ sd.id }}.html"><strong>{{ sd.id }}</strong> - {{ sd.title }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; background-color: #0d1117; padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+        <div>
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: #8b949e;">Decision ID</span>
+            <strong style="font-family: monospace; color: var(--text-bright);">{{ decision.id }}</strong>
+        </div>
+        <div>
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: #8b949e;">Confidence Score</span>
+            <strong style="color: var(--text-bright);">{{ "%.2f"|format(decision.confidence) }}</strong>
+        </div>
+        <div>
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: #8b949e;">Originating Agent</span>
+            <strong style="color: var(--text-bright);">{{ decision.originating_agent }}</strong>
+        </div>
+        <div>
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: #8b949e;">Created At</span>
+            <strong style="color: var(--text-bright);">{{ decision.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</strong>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 2rem;">
+        <h3 style="color: var(--text-bright); border-bottom: 1px solid var(--divider-color); padding-bottom: 0.25rem;">Rationale</h3>
+        <p style="white-space: pre-wrap;">{{ decision.rationale }}</p>
+    </div>
+
+    {% if decision.alternatives_considered %}
+        <div style="margin-bottom: 2rem;">
+            <h3 style="color: var(--text-bright); border-bottom: 1px solid var(--divider-color); padding-bottom: 0.25rem;">Alternatives Considered</h3>
+            <ul style="padding-left: 1.25rem;">
+                {% for alt in decision.alternatives_considered %}
+                    <li>{{ alt }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if decision.affected_files %}
+        <div style="margin-bottom: 1rem;">
+            <h3 style="color: var(--text-bright); border-bottom: 1px solid var(--divider-color); padding-bottom: 0.25rem;">Affected Files</h3>
+            <ul style="padding-left: 1.25rem; font-family: monospace; font-size: 0.9rem; color: #58a6ff;">
+                {% for f in decision.affected_files %}
+                    <li>{{ f }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

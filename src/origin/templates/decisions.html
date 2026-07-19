@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" style="color: var(--accent-green);">Active Architecture Decisions</h2>
+    </div>
+    {% if not active_decisions %}
+        <p style="padding: 1rem 0; color: #8b949e; text-align: center;">No active decisions found.</p>
+    {% else %}
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-bright);">
+                    <th style="padding: 0.75rem 0.5rem;">ID</th>
+                    <th style="padding: 0.75rem 0.5rem;">Title</th>
+                    <th style="padding: 0.75rem 0.5rem;">Confidence</th>
+                    <th style="padding: 0.75rem 0.5rem;">Last Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in active_decisions %}
+                    <tr style="border-bottom: 1px solid var(--divider-color);">
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html" style="font-family: monospace; font-weight: bold;">{{ d.id }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html">{{ d.title }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;">{{ "%.2f"|format(d.confidence) }}</td>
+                        <td style="padding: 0.75rem 0.5rem; color: #8b949e; font-size: 0.9rem;">{{ d.updated_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" style="color: var(--accent-yellow);">Proposed Decisions (Pending Review)</h2>
+    </div>
+    {% if not proposed_decisions %}
+        <p style="padding: 1rem 0; color: #8b949e; text-align: center;">No proposed decisions pending review.</p>
+    {% else %}
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-bright);">
+                    <th style="padding: 0.75rem 0.5rem;">ID</th>
+                    <th style="padding: 0.75rem 0.5rem;">Title</th>
+                    <th style="padding: 0.75rem 0.5rem;">Confidence</th>
+                    <th style="padding: 0.75rem 0.5rem;">Submitted</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in proposed_decisions %}
+                    <tr style="border-bottom: 1px solid var(--divider-color);">
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html" style="font-family: monospace; font-weight: bold; color: var(--accent-yellow);">{{ d.id }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html" style="color: var(--accent-yellow);">{{ d.title }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;">{{ "%.2f"|format(d.confidence) }}</td>
+                        <td style="padding: 0.75rem 0.5rem; color: #8b949e; font-size: 0.9rem;">{{ d.created_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" style="color: #8b949e;">Superseded & Rejected Decisions</h2>
+    </div>
+    {% if not history_decisions %}
+        <p style="padding: 1rem 0; color: #8b949e; text-align: center;">No superseded or rejected decisions found.</p>
+    {% else %}
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-bright);">
+                    <th style="padding: 0.75rem 0.5rem;">ID</th>
+                    <th style="padding: 0.75rem 0.5rem;">Title</th>
+                    <th style="padding: 0.75rem 0.5rem;">Status</th>
+                    <th style="padding: 0.75rem 0.5rem;">Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in history_decisions %}
+                    <tr style="border-bottom: 1px solid var(--divider-color);">
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html" style="font-family: monospace; font-weight: bold; color: #8b949e;">{{ d.id }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;"><a href="decisions/{{ d.id }}.html" style="color: #8b949e;">{{ d.title }}</a></td>
+                        <td style="padding: 0.75rem 0.5rem;">
+                            <span class="badge {% if d.status == 'superseded' %}badge-superseded{% else %}badge-rejected{% endif %}">
+                                {{ d.status }}
+                            </span>
+                        </td>
+                        <td style="padding: 0.75rem 0.5rem; color: #8b949e; font-size: 0.9rem;">{{ d.updated_at.strftime('%Y-%m-%d') }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+{% endblock %}

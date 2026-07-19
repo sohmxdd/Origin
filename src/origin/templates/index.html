@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="health-card" style="display: flex; justify-content: space-between; align-items: center; border-left: 5px solid {% if health_status == 'Healthy' %}var(--accent-green){% elif health_status == 'Warnings' %}var(--accent-yellow){% else %}var(--accent-red){% endif %};">
+    <div>
+        <h2 style="margin: 0 0 0.5rem 0; color: var(--text-bright);">System Diagnostics</h2>
+        <p style="margin: 0; font-size: 0.95rem; color: #8b949e;">
+            {% if health_status == 'Healthy' %}
+                All checks passed. The Origin workspace is completely healthy.
+            {% elif health_status == 'Warnings' %}
+                Workspace is healthy but found {{ num_warnings }} warning(s) (e.g. stale references or conflicts).
+            {% else %}
+                Workspace has {{ num_errors }} critical integrity issue(s) that require attention.
+            {% endif %}
+        </p>
+    </div>
+    <span class="badge {% if health_status == 'Healthy' %}badge-active{% elif health_status == 'Warnings' %}badge-proposed{% else %}badge-superseded{% endif %}" style="font-size: 1rem; padding: 0.4rem 1rem;">
+        {{ health_status }}
+    </span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+    <div class="card" style="text-align: center; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 0.9rem; text-transform: uppercase; color: #8b949e;">Active Decisions</h3>
+        <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: bold; color: var(--accent-green);">{{ counts.active }}</p>
+    </div>
+    <div class="card" style="text-align: center; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 0.9rem; text-transform: uppercase; color: #8b949e;">Proposed Decisions</h3>
+        <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: bold; color: var(--accent-yellow);">{{ counts.proposed }}</p>
+    </div>
+    <div class="card" style="text-align: center; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 0.9rem; text-transform: uppercase; color: #8b949e;">Superseded</h3>
+        <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: bold; color: #8b949e;">{{ counts.superseded }}</p>
+    </div>
+    <div class="card" style="text-align: center; margin-bottom: 0;">
+        <h3 style="margin: 0; font-size: 0.9rem; text-transform: uppercase; color: #8b949e;">Memory Keys</h3>
+        <p style="margin: 0.5rem 0 0 0; font-size: 2.5rem; font-weight: bold; color: #58a6ff;">{{ counts.memory }}</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Activity Log</h2>
+    </div>
+    {% if not timeline_events %}
+        <p style="text-align: center; padding: 2rem 0; color: #8b949e;">No timeline activity recorded in this workspace.</p>
+    {% else %}
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {% for evt in timeline_events %}
+                <div style="display: flex; justify-content: space-between; border-left: 2px solid var(--border-color); padding-left: 1rem; margin-left: 0.5rem;">
+                    <div>
+                        <span style="font-weight: 600; color: var(--text-bright);">{{ evt.summary }}</span>
+                        <span style="font-size: 0.8rem; color: #8b949e; margin-left: 0.5rem;">by {{ evt.originating_agent }}</span>
+                    </div>
+                    <span style="font-size: 0.85rem; color: #8b949e;">{{ evt.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

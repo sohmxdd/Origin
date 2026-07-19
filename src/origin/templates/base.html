@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ workspace_name }} - Origin ADR Log</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --container-bg: #161b22;
+            --text-color: #c9d1d9;
+            --text-bright: #f0f6fc;
+            --accent-cyan: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-red: #f85149;
+            --border-color: #30363d;
+            --divider-color: #21262d;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #010409;
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 0;
+        }
+
+        .header-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+
+        .logo-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-family: monospace;
+            font-weight: bold;
+            color: #00ffff;
+            background: #1f2937;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            border: 1px solid #00ffff;
+            font-size: 1.25rem;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--text-bright);
+        }
+
+        nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s ease;
+        }
+
+        nav a:hover, nav a.active {
+            color: #00ffff;
+        }
+
+        .main-container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        footer {
+            max-width: 1000px;
+            margin: 4rem auto 2rem auto;
+            border-top: 1px solid var(--divider-color);
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-active {
+            background-color: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .badge-proposed {
+            background-color: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+        }
+
+        .badge-superseded, .badge-rejected {
+            background-color: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .health-card {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Lists and links styling */
+        a {
+            color: #00ffff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .card {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--divider-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-bright);
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo-title">
+                <span class="logo">⚛ ATOM</span>
+                <h1>{{ workspace_name }} <span style="font-weight: 300; font-size: 0.85em; color: #8b949e;">| Origin ADR</span></h1>
+            </div>
+            <nav>
+                <a href="{{ relative_path }}index.html" class="{% if current_page == 'index' %}active{% endif %}">Overview</a>
+                <a href="{{ relative_path }}decisions.html" class="{% if current_page == 'decisions' %}active{% endif %}">Decisions</a>
+                <a href="{{ relative_path }}knowledge.html" class="{% if current_page == 'knowledge' %}active{% endif %}">Knowledge</a>
+                <a href="{{ relative_path }}timeline.html" class="{% if current_page == 'timeline' %}active{% endif %}">Timeline</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer>
+        Generated by <a href="https://github.com/sohmxdd/Origin" target="_blank">Origin Persistent Memory Layer</a>. Workspace: {{ workspace_name }} | Schema version: 2.0
+    </footer>
+</body>
+</html>
