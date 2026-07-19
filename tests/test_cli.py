@@ -227,3 +227,34 @@ def test_cli_doctor_conflict(cli_runner: CliRunner) -> None:
     result = cli_runner.invoke(app, ["doctor"])
     assert "both affect src/db.py" in result.stdout
     assert "Workspace is healthy and ready to go!" not in result.stdout
+
+
+def test_cli_doctor_json(cli_runner: CliRunner) -> None:
+    """Verify origin doctor --format json output and exit code behavior."""
+    import json
+    cli_runner.invoke(app, ["init"])
+    
+    # 1. Clean workspace (except not a git repo warning)
+    result = cli_runner.invoke(app, ["doctor", "--format", "json"])
+    assert result.exit_code == 0
+    findings = json.loads(result.stdout)
+    assert isinstance(findings, list)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "warning"
+    assert "Workspace root is not a git repository" in findings[0]["message"]
+
+    # 2. Workspace with errors (simulate schema mismatch)
+    import yaml
+    config_path = ".origin/config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    config["schema_version"] = "3.0"
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(config, f)
+
+    result_err = cli_runner.invoke(app, ["doctor", "--format", "json"])
+    assert result_err.exit_code == 1
+    findings_err = json.loads(result_err.stdout)
+    assert isinstance(findings_err, list)
+    assert any(f["severity"] == "error" and "schema_version mismatch" in f["message"] for f in findings_err)
+

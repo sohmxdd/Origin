@@ -28,3 +28,8 @@ class DecisionNotActiveError(OriginError):
 class InvalidArtifactError(OriginError):
     """Raised when artifact validation fails."""
     pass
+
+
+class SecretDetectedError(OriginError):
+    """Raised when a potential credential or secret pattern is detected."""
+    pass

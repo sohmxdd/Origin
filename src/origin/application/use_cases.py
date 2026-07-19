@@ -15,7 +15,9 @@ from origin.exceptions import (
     DecisionNotFoundError,
     InvalidArtifactError,
     WorkspaceAlreadyInitializedError,
+    SecretDetectedError,
 )
+from origin.domain.secrets import detect_secret_patterns
 from origin.infrastructure.database import ArtifactRepository
 from origin.infrastructure.git import GitHelper
 from origin.infrastructure.mirror import MirrorWriter
@@ -104,6 +106,20 @@ def add_decision(
     Returns:
         The created Decision instance.
     """
+    # Secrets validation check
+    for field, val in [("title", title), ("rationale", rationale)]:
+        matches = detect_secret_patterns(val)
+        if matches:
+            raise SecretDetectedError(
+                f"Write rejected: content appears to contain a credential pattern ({matches[0]}). Remove it and try again."
+            )
+    for alt in alternatives_considered:
+        matches = detect_secret_patterns(alt)
+        if matches:
+            raise SecretDetectedError(
+                f"Write rejected: content appears to contain a credential pattern ({matches[0]}). Remove it and try again."
+            )
+
     repo, mirror, git = _get_infra(workspace_root)
 
     # Create and save Decision
@@ -171,6 +187,20 @@ def supersede_decision(
         DecisionNotFoundError: If old_decision_id doesn't exist.
         DecisionNotActiveError: If the old decision is not active.
     """
+    # Secrets validation check
+    for field, val in [("title", title), ("rationale", rationale)]:
+        matches = detect_secret_patterns(val)
+        if matches:
+            raise SecretDetectedError(
+                f"Write rejected: content appears to contain a credential pattern ({matches[0]}). Remove it and try again."
+            )
+    for alt in alternatives_considered:
+        matches = detect_secret_patterns(alt)
+        if matches:
+            raise SecretDetectedError(
+                f"Write rejected: content appears to contain a credential pattern ({matches[0]}). Remove it and try again."
+            )
+
     repo, mirror, git = _get_infra(workspace_root)
 
     # Retrieve old decision
@@ -240,6 +270,13 @@ def set_memory(
     Returns:
         The updated/created MemoryEntry.
     """
+    # Secrets validation check
+    matches = detect_secret_patterns(value)
+    if matches:
+        raise SecretDetectedError(
+            f"Write rejected: content appears to contain a credential pattern ({matches[0]}). Remove it and try again."
+        )
+
     repo, mirror, git = _get_infra(workspace_root)
 
     valid_categories = ["architecture", "convention", "tech_stack", "glossary", "deployment"]

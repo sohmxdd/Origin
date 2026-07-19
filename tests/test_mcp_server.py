@@ -336,4 +336,23 @@ def test_mcp_full_tool_call_under_tui_load(mcp_workspace):
         proc.wait(timeout=5)
 
 
+@pytest.mark.asyncio
+async def test_mcp_secrets_guard_blocking(mcp_workspace: str) -> None:
+    """Verify MCP tools cleanly block secret patterns and return client-facing error strings."""
+    # 1. Propose decision with AWS Key pattern
+    response = await mcp.call_tool(
+        "origin_add_decision",
+        arguments={
+            "title": "Use Redis",
+            "rationale": "Redis key details here: AKIAIOSFODNN7EXAMPLE",
+        },
+    )
+    content_blocks = response[0]
+    assert len(content_blocks) == 1
+    # Check that it returns a clean error string back to client instead of throwing or hanging
+    assert "Error adding decision: Write rejected: content appears to contain a credential pattern" in content_blocks[0].text
+    assert "(AWS Access Key ID)" in content_blocks[0].text
+
+
+
 

@@ -401,18 +401,28 @@ def export(
 
 @app.command("doctor")
 def doctor(
-    fix: bool = typer.Option(False, "--fix", help="Automatically repair index drift and refresh mirrors.")
+    fix: bool = typer.Option(False, "--fix", help="Automatically repair index drift and refresh mirrors."),
+    format: str = typer.Option("text", "--format", help="Output format ('text' or 'json')."),
 ) -> None:
     """Sanity check the integrity, configurations, and schema of the workspace."""
     root = find_workspace_root()
     origin_dir = os.path.join(root, ".origin")
 
     if not os.path.isdir(origin_dir):
-        typer.secho("Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
+        if format == "json":
+            import json
+            print(json.dumps([{
+                "severity": "error",
+                "message": "Not inside an Origin workspace (no .origin folder found).",
+                "ids": []
+            }], indent=2))
+        else:
+            typer.secho("Error: Not inside an Origin workspace (no .origin folder found).", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
     if fix:
-        typer.secho("Fixing workspace index and mirrors...", fg=typer.colors.CYAN)
+        if format != "json":
+            typer.secho("Fixing workspace index and mirrors...", fg=typer.colors.CYAN)
         try:
             config = use_cases.load_config(root)
             from origin.infrastructure.database import ArtifactRepository
@@ -425,48 +435,56 @@ def doctor(
 
             export_flat_file(root, "generic")
             export_flat_file(root, "claude-code")
-            typer.secho("[OK] Rebuilt SQLite index cache and regenerated mirrors.", fg=typer.colors.GREEN)
+            if format != "json":
+                typer.secho("[OK] Rebuilt SQLite index cache and regenerated mirrors.", fg=typer.colors.GREEN)
         except Exception as e:
-            typer.secho(f"Error executing fix: {e}", fg=typer.colors.RED)
+            if format == "json":
+                import json
+                print(json.dumps([{
+                    "severity": "error",
+                    "message": f"Error executing fix: {e}",
+                    "ids": []
+                }], indent=2))
+            else:
+                typer.secho(f"Error executing fix: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-    errors = 0
-    warnings = 0
+    errors = []
+    warnings = []
 
     # 1. Check config.yaml
     config_path = os.path.join(origin_dir, "config.yaml")
     if not os.path.exists(config_path):
-        typer.secho("[FAIL] config.yaml is missing.", fg=typer.colors.RED)
-        errors += 1
+        errors.append({
+            "message": "config.yaml is missing.",
+            "ids": []
+        })
     else:
         try:
             config = use_cases.load_config(root)
             if config.schema_version != "2.0":
-                typer.secho(
-                    f"[FAIL] schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
-                    fg=typer.colors.RED,
-                )
-                errors += 1
-            else:
-                typer.secho(
-                    f"[OK] config.yaml is valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').",
-                    fg=typer.colors.GREEN,
-                )
+                errors.append({
+                    "message": f"schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
+                    "ids": []
+                })
         except Exception as e:
-            typer.secho(f"[FAIL] config.yaml failed validation: {e}", fg=typer.colors.RED)
-            errors += 1
+            errors.append({
+                "message": f"config.yaml failed validation: {e}",
+                "ids": []
+            })
 
     # 2. Check SQLite db
     db_path = os.path.join(origin_dir, "workspace.db")
     if not os.path.exists(db_path):
-        typer.secho("[FAIL] SQLite workspace.db file is missing.", fg=typer.colors.RED)
-        errors += 1
+        errors.append({
+            "message": "SQLite workspace.db file is missing.",
+            "ids": []
+        })
     else:
         try:
             from origin.infrastructure.database import ArtifactRepository
             repo = ArtifactRepository(db_path)
             repo.list_decisions()
-            typer.secho("[OK] SQLite workspace.db schema is readable and valid.", fg=typer.colors.GREEN)
 
             # Check affected files staleness
             decisions = repo.list_decisions(status="active")
@@ -474,41 +492,122 @@ def doctor(
                 for f in dec.affected_files:
                     full_f_path = os.path.join(root, f)
                     if not os.path.exists(full_f_path):
-                        typer.secho(
-                            f"[WARN] Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
-                            fg=typer.colors.YELLOW,
-                        )
-                        warnings += 1
+                        warnings.append({
+                            "message": f"Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
+                            "ids": [dec.id, f]
+                        })
 
             # Check for conflicting active decisions (file overlap heuristic)
             from origin.application.use_cases import check_conflicting_decisions
             conflicts = check_conflicting_decisions(decisions)
             for id1, id2, f in conflicts:
-                typer.secho(
-                    f"[WARN] Decisions {id1} and {id2} both affect {f} — review for conflicts.",
-                    fg=typer.colors.YELLOW,
-                )
-                warnings += 1
+                warnings.append({
+                    "message": f"Decisions {id1} and {id2} both affect {f} — review for conflicts.",
+                    "ids": [id1, id2, f]
+                })
         except Exception as e:
-            typer.secho(f"[FAIL] SQLite database integrity check failed: {e}", fg=typer.colors.RED)
-            errors += 1
+            errors.append({
+                "message": f"SQLite database integrity check failed: {e}",
+                "ids": []
+            })
 
     # 3. Check Git Status
     git_dir = os.path.join(root, ".git")
     if not os.path.isdir(git_dir):
-        typer.secho("[WARN] Workspace root is not a git repository.", fg=typer.colors.YELLOW)
-        warnings += 1
-    else:
-        typer.secho("[OK] Git repository detected.", fg=typer.colors.GREEN)
+        warnings.append({
+            "message": "Workspace root is not a git repository.",
+            "ids": []
+        })
 
-    if errors > 0:
-        typer.secho(f"\nDoctor found {errors} integrity issue(s) and {warnings} warning(s).", fg=typer.colors.RED, bold=True)
+    # Print results based on format
+    if format == "json":
+        import json
+        findings = []
+        for err in errors:
+            findings.append({
+                "severity": "error",
+                "message": err["message"],
+                "ids": err["ids"]
+            })
+        for warn in warnings:
+            findings.append({
+                "severity": "warning",
+                "message": warn["message"],
+                "ids": warn["ids"]
+            })
+        print(json.dumps(findings, indent=2))
+    else:
+        # Text output
+        # config.yaml status
+        if not os.path.exists(config_path):
+            typer.secho("[FAIL] config.yaml is missing.", fg=typer.colors.RED)
+        else:
+            try:
+                config = use_cases.load_config(root)
+                if config.schema_version != "2.0":
+                    typer.secho(
+                        f"[FAIL] schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
+                        fg=typer.colors.RED,
+                    )
+                else:
+                    typer.secho(
+                        f"[OK] config.yaml is valid (Workspace: '{config.workspace_name}', Schema: '{config.schema_version}').",
+                        fg=typer.colors.GREEN,
+                    )
+            except Exception as e:
+                typer.secho(f"[FAIL] config.yaml failed validation: {e}", fg=typer.colors.RED)
+
+        # SQLite db status
+        if not os.path.exists(db_path):
+            typer.secho("[FAIL] SQLite workspace.db file is missing.", fg=typer.colors.RED)
+        else:
+            try:
+                from origin.infrastructure.database import ArtifactRepository
+                repo = ArtifactRepository(db_path)
+                repo.list_decisions()
+                typer.secho("[OK] SQLite workspace.db schema is readable and valid.", fg=typer.colors.GREEN)
+
+                # Warnings are printed immediately in text format
+                decisions = repo.list_decisions(status="active")
+                for dec in decisions:
+                    for f in dec.affected_files:
+                        full_f_path = os.path.join(root, f)
+                        if not os.path.exists(full_f_path):
+                            typer.secho(
+                                f"[WARN] Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
+                                fg=typer.colors.YELLOW,
+                            )
+                from origin.application.use_cases import check_conflicting_decisions
+                conflicts = check_conflicting_decisions(decisions)
+                for id1, id2, f in conflicts:
+                    typer.secho(
+                        f"[WARN] Decisions {id1} and {id2} both affect {f} — review for conflicts.",
+                        fg=typer.colors.YELLOW,
+                    )
+            except Exception as e:
+                typer.secho(f"[FAIL] SQLite database integrity check failed: {e}", fg=typer.colors.RED)
+
+        # Git status
+        if not os.path.isdir(git_dir):
+            typer.secho("[WARN] Workspace root is not a git repository.", fg=typer.colors.YELLOW)
+        else:
+            typer.secho("[OK] Git repository detected.", fg=typer.colors.GREEN)
+
+        # Summary
+        num_errors = len(errors)
+        num_warnings = len(warnings)
+        if num_errors > 0:
+            typer.secho(f"\nDoctor found {num_errors} integrity issue(s) and {num_warnings} warning(s).", fg=typer.colors.RED, bold=True)
+        else:
+            if num_warnings > 0:
+                typer.secho(f"\nWorkspace is healthy with {num_warnings} warnings.", fg=typer.colors.YELLOW, bold=True)
+            else:
+                typer.secho("\nWorkspace is healthy and ready to go!", fg=typer.colors.GREEN, bold=True)
+
+    if len(errors) > 0:
         raise typer.Exit(code=1)
     else:
-        if warnings > 0:
-            typer.secho(f"\nWorkspace is healthy with {warnings} warnings.", fg=typer.colors.YELLOW, bold=True)
-        else:
-            typer.secho("\nWorkspace is healthy and ready to go!", fg=typer.colors.GREEN, bold=True)
+        raise typer.Exit(code=0)
 
 
 @app.command("migrate")

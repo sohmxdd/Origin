@@ -1,0 +1,146 @@
+name: Origin Doctor CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  doctor:
+    name: Origin Doctor Health Check
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Origin
+        run: |
+          pip install -e .
+
+      - name: Run Origin Doctor
+        id: run_doctor
+        run: |
+          # Run doctor in JSON format, save to findings.json
+          # Use || true to prevent the step from failing immediately so we can parse findings and comment
+          origin doctor --format json > findings.json || echo "doctor_failed=true" >> $GITHUB_ENV
+
+      - name: Process Doctor Findings
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+
+          pr_number = os.environ.get("PR_NUMBER")
+          repo = os.environ.get("REPO")
+          token = os.environ.get("GITHUB_TOKEN")
+          doctor_failed = os.environ.get("doctor_failed") == "true"
+
+          # Load findings
+          findings = []
+          if os.path.exists("findings.json"):
+              try:
+                  with open("findings.json", "r", encoding="utf-8") as f:
+                      findings = json.load(f)
+              except Exception as e:
+                  print(f"Error parsing findings.json: {e}")
+                  # If we failed to parse, it means there was a syntax/corruption issue
+                  findings = [{"severity": "error", "message": f"Failed to parse doctor output: {e}", "ids": []}]
+
+          # Group findings
+          errors = [f for f in findings if f["severity"] == "error"]
+          warnings = [f for f in findings if f["severity"] == "warning"]
+
+          # Print diagnostics to log
+          print(f"Found {len(errors)} error(s) and {len(warnings)} warning(s).")
+          for err in errors:
+              print(f"ERROR: {err['message']}")
+          for warn in warnings:
+              print(f"WARNING: {warn['message']}")
+
+          # Manage PR comment if there are warnings (or if errors exist but we also want to display them, though errors fail the build)
+          # We only post/update warnings comment if there are warnings.
+          marker = "<!-- origin-doctor-warnings-marker -->"
+          
+          # 1. Fetch existing comments to find the marker
+          headers = {
+              "Authorization": f"token {token}",
+              "Accept": "application/vnd.github+json"
+          }
+          comments_url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
+          
+          existing_comment_id = None
+          try:
+              req = urllib.request.Request(comments_url, headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  comments = json.loads(resp.read().decode("utf-8"))
+                  for c in comments:
+                      if marker in c.get("body", ""):
+                          existing_comment_id = c["id"]
+                          break
+          except Exception as e:
+              print(f"Failed to fetch comments: {e}")
+
+          # 2. Build comment body
+          comment_body = ""
+          if warnings:
+              comment_body = f"{marker}\n### ⚠️ Origin Workspace Health Warnings\n\n"
+              comment_body += "Origin doctor detected the following warnings in this workspace:\n\n"
+              for w in warnings:
+                  comment_body += f"* {w['message']}\n"
+              comment_body += "\n*Note: These warnings do not block the build, but should be reviewed.*"
+
+          # 3. Create or update comment
+          if comment_body:
+              data = json.dumps({"body": comment_body}).encode("utf-8")
+              if existing_comment_id:
+                  # Update
+                  patch_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_comment_id}"
+                  req = urllib.request.Request(patch_url, data=data, headers=headers, method="PATCH")
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Updated existing warnings comment.")
+                  except Exception as e:
+                      print(f"Failed to update comment: {e}")
+              else:
+                  # Create
+                  req = urllib.request.Request(comments_url, data=data, headers=headers, method="POST")
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Created new warnings comment.")
+                  except Exception as e:
+                      print(f"Failed to post comment: {e}")
+          else:
+              # No warnings. If there was an existing comment, update it to show resolved
+              if existing_comment_id:
+                  resolved_body = f"{marker}\n### ✅ Origin Workspace Health Warnings Resolved!\n\nAll previously detected workspace warnings have been resolved."
+                  data = json.dumps({"body": resolved_body}).encode("utf-8")
+                  patch_url = f"https://api.github.com/repos/{repo}/issues/comments/{existing_comment_id}"
+                  req = urllib.request.Request(patch_url, data=data, headers=headers, method="PATCH")
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Cleared warnings comment.")
+                  except Exception as e:
+                      print(f"Failed to clear comment: {e}")
+
+          # 4. Fail the workflow if there are errors (or if the doctor command failed)
+          if errors or doctor_failed:
+              print("Failing build due to integrity errors.")
+              exit(1)
+          else:
+              print("Build passed successfully.")
+              exit(0)
