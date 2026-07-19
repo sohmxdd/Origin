@@ -218,9 +218,37 @@ To prevent your agent's context window from being overwhelmed as your workspace 
 * **Memory Preservation:** Memory entries are inherently compact and always included in full.
 * **Truncation Warning:** The bundle ends with a warning note (e.g. `12 older decisions summarized...`) when truncation occurs.
 
-### 2. Conflict Heuristics (`doctor` warnings)
+### 2. Conflict Heuristic Checks
 If two concurrent agents add active decisions that affect the same file without linking them via supersession, it poses a semantic integrity risk. 
 `origin doctor` (and TUI diagnostics) includes an optimized $O(N)$ conflict check that flags when two active decisions target overlapping paths in `affected_files`, reporting them as warnings so you can review and resolve them.
+
+---
+
+## 🔒 CI Enforcement & Secrets Guard
+
+Origin provides robust security boundaries and repository guardrails to protect against secret leakage and malicious branch execution:
+
+### 1. Domain-Level Secrets Guard
+To prevent accidental leaks of credentials into repository history (such as in decision rationales or memory values), Origin runs a domain-level secrets scanner on all free-text fields during writes:
+* **Detection Engine:**
+  * **AWS Key IDs:** Scan for patterns like `AKIA...` or `ASIA...` 20-character key codes.
+  * **Private Keys:** Scan for `-----BEGIN ... PRIVATE KEY-----` PEM headers.
+  * **Generic Secret/Token Assignments:** Scan for keys like `api_key`, `secret`, `token`, `password`, `passwd` followed by an assignment operator and an alphanumeric string of $\ge 16$ characters.
+  * **High-Entropy Strings:** Check all space/separator-delimited tokens of length $\ge 32$ using Shannon entropy (threshold $\ge 4.3$).
+* **False-Positive Exclusions:** Excludes URLs, Git commit SHAs (40 hex chars), and Origin ID formats (`dec_`, `mem_`, and `evt_` ULID prefixes) to allow legitimate references.
+* **Result:** Blocks the write outright with a clear, user-facing error message (`SecretDetectedError`).
+
+### 2. CI Doctor Enforcement
+Run `origin doctor` automatically as a pull request status check to enforce workspace health:
+* **CLI JSON Output:** Use `origin doctor --format json` to generate machine-readable JSON finding logs.
+* **Exit Codes:** Exits `1` on workspace integrity errors (schema version mismatch, missing files) and `0` on warnings-only (stale references, conflict overlaps) or clean states.
+* **Warnings Summarizer:** Comments on PRs with workspace health warnings. Uses a unique block marker to locate and update its comment on subsequent pushes instead of comment-spamming.
+
+### 3. PR Comment Workflow
+Allow repository maintainers to approve or reject proposed decisions directly in PR comment threads using `/origin accept <id>` and `/origin reject <id>`:
+* **Safe Sandbox Execution:** Clones and installs the trusted package version from the base branch (e.g., `main`), then executes it against the PR branch files (`pr-data`). The PR branch's own code is never run, blocking arbitrary code injection.
+* **Cheap Regex Pre-Filtering:** Compares the comment body with `^/origin (accept|reject) (dec_[A-Za-z0-9]+)$` before invoking the GitHub permission API to prevent rate limits.
+* **Permissions Model:** Only executes commands for repository collaborators with `write` or `admin` permissions. Restricts automated commits to internal branches, warning external fork PR comments of GitHub token limitations.
 
 ---
 
