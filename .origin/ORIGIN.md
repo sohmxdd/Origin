@@ -4,7 +4,7 @@ This is the active project memory and decision history. Use this context to alig
 
 ## Workspace Information
 - **Workspace Name:** Origin
-- **Schema Version:** 1.0
+- **Schema Version:** 2.0
 
 ## Active Decisions
 

@@ -1,6 +1,7 @@
 workspace_name: Origin
-schema_version: '1.0'
+schema_version: '2.0'
 agent_allowlist:
 - claude-code
 - codex-cli
 - human
+token_budget: 4000
