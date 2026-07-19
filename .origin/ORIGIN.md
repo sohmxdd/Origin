@@ -8,7 +8,9 @@ This is the active project memory and decision history. Use this context to alig
 
 ## Active Decisions
 
-No active decisions recorded yet.
+### Test PR Comment Workflow (`dec_01KXX2BCK9WX53SD5A6SKWJYKK`)
+- **Confidence:** 1.00 | **Agent:** human | **Updated:** 2026-07-19 11:35:59 UTC
+- **Rationale:** Verify that commenting on PR successfully triggers the Action to accept this decision.
 
 ## Active Project Memory
 
