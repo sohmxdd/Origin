@@ -12,7 +12,7 @@ We take the security of Origin seriously. If you find a security vulnerability, 
 
 2. **Email**:
    Alternatively, you can email security reports to the project maintainer:
-   * **Contact**: [soham.github@users.noreply.github.com](mailto:soham.github@users.noreply.github.com)
+   * **Contact**: [soham.mishra206@gmail.com](mailto:soham.mishra206@gmail.com)
    * Please include details such as a proof of concept (PoC), steps to reproduce, and potential impact.
 
 We will acknowledge your report within 48 hours and work with you to patch the issue and coordinate a public release/disclosure.
