@@ -6,12 +6,15 @@ query index/cache.
 """
 
 import json
+import logging
 import os
 import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 import yaml
+
+logger = logging.getLogger(__name__)
 
 from origin.domain.models import Artifact, Decision, MemoryEntry, TimelineEvent
 
@@ -206,8 +209,7 @@ class ArtifactRepository:
                     artifact = model_cls.model_validate(data)
                     self._save_to_index(artifact)
                 except Exception as e:
-                    import sys
-                    print(f"Error indexing file {file_path}: {e}", file=sys.stderr)
+                    logger.warning(f"Error indexing file {file_path}: {e}")
 
         self._set_stored_sync_state(current_state)
 

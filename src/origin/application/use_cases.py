@@ -4,9 +4,12 @@ Coordinates business rules, database actions, git history checks,
 and Markdown mirror file refreshes.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from origin.config import get_origin_dir, load_config, save_config, WorkspaceConfig
 from origin.domain.models import Artifact, Decision, MemoryEntry, TimelineEvent
@@ -149,10 +152,7 @@ def add_decision(
         # Refresh mirrors
         mirror.refresh_all(repo)
     except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        logger.warning(f"Timeline or mirror refresh post-write step failed: {e}", exc_info=True)
         decision.warnings.append(f"Post-write sync skipped: {e}")
 
     return decision
@@ -242,10 +242,7 @@ def supersede_decision(
         # Refresh mirrors
         mirror.refresh_all(repo)
     except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        logger.warning(f"Timeline or mirror refresh post-write step failed: {e}", exc_info=True)
         new_decision.warnings.append(f"Post-write sync skipped: {e}")
 
     return new_decision
@@ -319,10 +316,7 @@ def set_memory(
         # Refresh mirrors
         mirror.refresh_all(repo)
     except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        logger.warning(f"Timeline or mirror refresh post-write step failed: {e}", exc_info=True)
         entry.warnings.append(f"Post-write sync skipped: {e}")
 
     return entry
@@ -412,10 +406,7 @@ def accept_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
         repo.save(event)
         mirror.refresh_all(repo)
     except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        logger.warning(f"Timeline or mirror refresh post-write step failed: {e}", exc_info=True)
         decision.warnings.append(f"Post-write sync skipped: {e}")
     return decision
 
@@ -453,10 +444,7 @@ def reject_decision(workspace_root: str, decision_id: str, agent: str) -> Decisi
         repo.save(event)
         mirror.refresh_all(repo)
     except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        print(f"Warning: Timeline or mirror refresh post-write step failed: {e}", file=sys.stderr)
+        logger.warning(f"Timeline or mirror refresh post-write step failed: {e}", exc_info=True)
         decision.warnings.append(f"Post-write sync skipped: {e}")
     return decision
 
