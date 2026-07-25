@@ -1,5 +1,12 @@
 # Security Policy
 
+## Supported Versions
+
+| Version | Supported          |
+| ------- | ------------------ |
+| 2.0.x   | :white_check_mark: |
+| < 2.0   | :x:                |
+
 ## Reporting a Vulnerability
 
 We take the security of Origin seriously. If you find a security vulnerability, please do **not** open a public issue. Instead, report it privately to ensure it can be patched before public disclosure.
@@ -7,14 +14,15 @@ We take the security of Origin seriously. If you find a security vulnerability, 
 ### How to Report Privately
 
 1. **GitHub Private Vulnerability Reporting**:
-   You can report vulnerabilities privately directly via the repository's security tab:
-   Go to **Security** -> **Vulnerability Advisories** -> **New draft advisory** (or click **Report a vulnerability** on the main security page).
+   Go to **Security** -> **Vulnerability Advisories** -> **Report a vulnerability**.
 
 2. **Email**:
-   Alternatively, you can email security reports to the project maintainer:
+   Email security reports directly to the maintainer:
    * **Contact**: [soham.mishra206@gmail.com](mailto:soham.mishra206@gmail.com)
    * Please include details such as a proof of concept (PoC), steps to reproduce, and potential impact.
 
-We will acknowledge your report within 48 hours and work with you to patch the issue and coordinate a public release/disclosure.
+We will acknowledge your report within 48 hours and coordinate a fix.
 
-Thank you for helping keep Origin secure!
+## Security Architecture
+
+For detailed information on Origin's threat model, automated Secrets Guard, PyYAML safe-loading, and trusted-branch CI sandboxing, see [docs/security.md](docs/security.md).
