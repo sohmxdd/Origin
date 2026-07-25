@@ -30,6 +30,7 @@ jobs:
           import os
           import re
           import subprocess
+          import time
           import urllib.request
           import urllib.error
 
@@ -46,13 +47,27 @@ jobs:
               "Accept": "application/vnd.github+json"
           }
 
+          def fetch_url_with_retry(req, max_retries=3):
+              total_slept = 0
+              for attempt in range(max_retries + 1):
+                  try:
+                      return urllib.request.urlopen(req)
+                  except urllib.error.HTTPError as e:
+                      if e.code in [429, 500, 502, 503, 504] and attempt < max_retries and total_slept < 30:
+                          sleep_time = min(2 ** attempt, 10)
+                          total_slept += sleep_time
+                          print(f"HTTP {e.code} received. Retrying in {sleep_time}s (attempt {attempt + 1}/{max_retries})...")
+                          time.sleep(sleep_time)
+                      else:
+                          raise e
+
           def post_comment(msg: str):
               """Helper to post a comment back to the PR."""
               url = f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments"
               data = json.dumps({"body": msg}).encode("utf-8")
               req = urllib.request.Request(url, data=data, headers=headers, method="POST")
               try:
-                  with urllib.request.urlopen(req) as resp:
+                  with fetch_url_with_retry(req) as resp:
                       print("Posted response comment.")
               except Exception as e:
                   print(f"Failed to post comment: {e}")
@@ -71,7 +86,7 @@ jobs:
           perm_url = f"https://api.github.com/repos/{repo}/collaborators/{commenter}/permission"
           req = urllib.request.Request(perm_url, headers=headers)
           try:
-              with urllib.request.urlopen(req) as resp:
+              with fetch_url_with_retry(req) as resp:
                   perm_data = json.loads(resp.read().decode("utf-8"))
                   permission = perm_data.get("permission")
                   if permission not in ["write", "admin"]:
@@ -86,7 +101,7 @@ jobs:
           # 3. Retrieve PR details to check head ref and fork status
           req = urllib.request.Request(pr_url, headers=headers)
           try:
-              with urllib.request.urlopen(req) as resp:
+              with fetch_url_with_retry(req) as resp:
                   pr_data = json.loads(resp.read().decode("utf-8"))
                   head_repo_fullname = pr_data["head"]["repo"]["full_name"]
                   head_ref = pr_data["head"]["ref"]
