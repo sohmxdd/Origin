@@ -399,6 +399,27 @@ def export(
         raise typer.Exit(code=1)
 
 
+@app.command("version")
+def version() -> None:
+    """Print Origin package version and current workspace schema version."""
+    try:
+        from importlib.metadata import version as get_version
+        pkg_version = get_version("origin-cli")
+    except Exception:
+        pkg_version = "2.0.0"
+
+    schema_version = "2.0"
+    try:
+        root = find_workspace_root()
+        if root:
+            config = use_cases.load_config(root)
+            schema_version = config.schema_version
+    except Exception:
+        pass
+
+    typer.echo(f"Origin CLI version: {pkg_version} | Workspace Schema version: {schema_version}")
+
+
 @app.command("blame")
 def blame(
     file_path: str = typer.Argument(..., help="Path of the file to blame.")

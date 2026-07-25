@@ -258,3 +258,13 @@ def test_cli_doctor_json(cli_runner: CliRunner) -> None:
     assert isinstance(findings_err, list)
     assert any(f["severity"] == "error" and "schema_version mismatch" in f["message"] for f in findings_err)
 
+
+def test_cli_version(cli_runner: CliRunner) -> None:
+    """Verify version command outputs package and schema version."""
+    cli_runner.invoke(app, ["init"])
+    result = cli_runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert "Origin CLI version:" in result.stdout
+    assert "Workspace Schema version:" in result.stdout
+
+
