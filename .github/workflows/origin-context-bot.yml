@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout Default Branch (Trusted Code)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: trusted-origin
 
