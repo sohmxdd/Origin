@@ -279,4 +279,14 @@ def test_cli_badge(cli_runner: CliRunner) -> None:
     assert '<a href="https://mysite.org"><img src="https://img.shields.io/endpoint?url=https://mysite.org/badge.json" alt="Origin Architecture Health" /></a>' in res_html.stdout
 
 
+def test_cli_doctor_ci(cli_runner: CliRunner) -> None:
+    """Verify doctor --ci outputs concise single-line summary string."""
+    cli_runner.invoke(app, ["init"])
+    res = cli_runner.invoke(app, ["doctor", "--ci"])
+    assert res.exit_code == 0
+    assert "error(s)" in res.stdout
+    assert "warning(s)" in res.stdout
+
+
+
 

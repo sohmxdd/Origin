@@ -506,6 +506,7 @@ def blame(
 def doctor(
     fix: bool = typer.Option(False, "--fix", help="Automatically repair index drift and refresh mirrors."),
     format: str = typer.Option("text", "--format", help="Output format ('text' or 'json')."),
+    ci: bool = typer.Option(False, "--ci", help="Output a brief single-line status summary."),
 ) -> None:
     """Sanity check the integrity, configurations, and schema of the workspace."""
     root = find_workspace_root()
@@ -623,7 +624,17 @@ def doctor(
         })
 
     # Print results based on format
-    if format == "json":
+    if ci:
+        num_errors = len(errors)
+        num_warnings = len(warnings)
+        if num_errors > 0:
+            typer.secho(f"✕ {num_errors} error(s), {num_warnings} warning(s)", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        else:
+            color = typer.colors.YELLOW if num_warnings > 0 else typer.colors.GREEN
+            typer.secho(f"✓ {num_errors} error(s), {num_warnings} warning(s)", fg=color)
+            raise typer.Exit(code=0)
+    elif format == "json":
         import json
         findings = []
         for err in errors:
