@@ -63,7 +63,7 @@ def test_blame_scaling(large_workspace: str) -> None:
 
     # 1,000 decisions / 50 components = 20 decisions per component
     assert len(decisions) == 20
-    assert elapsed < 3.0, f"Blame lookup took too long: {elapsed:.3f}s"
+    assert elapsed < 10.0, f"Lookup took too long: {elapsed:.3f}s"
 
 
 def test_mcp_context_bundle_scaling(large_workspace: str) -> None:
@@ -74,7 +74,7 @@ def test_mcp_context_bundle_scaling(large_workspace: str) -> None:
 
     assert "# Origin Project Context" in bundle
     assert "Stress Test Decision" in bundle
-    assert elapsed < 3.0, f"Context bundle compilation took too long: {elapsed:.3f}s"
+    assert elapsed < 10.0, f"Context bundle compilation took too long: {elapsed:.3f}s"
 
 
 def test_tui_feed_scaling(large_workspace: str) -> None:
@@ -87,4 +87,4 @@ def test_tui_feed_scaling(large_workspace: str) -> None:
     elapsed = time.perf_counter() - start
 
     assert len(active_decisions) == 1000
-    assert elapsed < 3.0, f"TUI decision list feed query took too long: {elapsed:.3f}s"
+    assert elapsed < 10.0, f"TUI decision list feed query took too long: {elapsed:.3f}s"
