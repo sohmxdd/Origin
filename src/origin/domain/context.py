@@ -56,7 +56,7 @@ def compile_context_bundle(
         )
     )
 
-    promoted_indices = set()
+    promoted_indices: set[int] = set()
     
     # Helper to construct the markdown bundle given a set of promoted indices
     def _format_bundle(promoted: set[int]) -> str:

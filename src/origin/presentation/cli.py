@@ -894,7 +894,7 @@ def build_site(
         history_decisions = [d for d in all_decisions if d.status in ("superseded", "rejected")]
 
         # Group memory entries
-        memory_entries = {}
+        memory_entries: Dict[str, List[MemoryEntry]] = {}
         for m in all_memories:
             memory_entries.setdefault(m.category, []).append(m)
 

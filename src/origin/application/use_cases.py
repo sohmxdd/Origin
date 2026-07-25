@@ -7,7 +7,7 @@ and Markdown mirror file refreshes.
 import logging
 import os
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -700,7 +700,7 @@ def check_conflicting_decisions(decisions: List[Decision]) -> List[tuple[str, st
     active_decs = [d for d in decisions if d.status == "active"]
     
     # Map file path -> list of decisions affecting it
-    file_to_decisions = {}
+    file_to_decisions: Dict[str, List[Decision]] = {}
     for dec in active_decs:
         for f in dec.affected_files:
             file_to_decisions.setdefault(f, []).append(dec)
