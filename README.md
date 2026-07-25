@@ -186,7 +186,11 @@ This prints the JSON snippet (`origin-mcp` command + args) you can paste into an
 | Command | Description |
 | :--- | :--- |
 | `origin init` | Creates `.origin/` folder, YAML directories, and SQLite cache |
-| `origin` | Launch the interactive terminal dashboard |
+| `origin` / `origin tui` | Launch the interactive terminal dashboard |
+| `origin version` | Prints package version and workspace schema version side-by-side |
+| `origin badge` | Generates Markdown and HTML badge snippets for repository README |
+| `origin blame <file>` | Traces chronological decision history affecting a specific file |
+| `origin build-site` | Compiles workspace ADRs and memory into a browsable static HTML site |
 | `origin decision add` | Record new architecture decision (interactive or flags) |
 | `origin decision add --propose` | Record as a proposed decision (pending human review) |
 | `origin decision accept <id>` | Accept and activate a proposed decision |
@@ -201,6 +205,7 @@ This prints the JSON snippet (`origin-mcp` command + args) you can paste into an
 | `origin export --target <target>` | Exports context to `claude-code`, `cursor`, or `generic` |
 | `origin connect <target>` | Export context + auto-configure editor MCP integration |
 | `origin doctor` | Workspace integrity check and diagnostics |
+| `origin doctor --ci` | Single-line summary status for CI logs (`✓ 0 error(s), 2 warning(s)`) |
 | `origin doctor --fix` | Rebuild SQLite index from YAML files and regenerate mirrors |
 | `origin migrate` | Migrate a v1.0 workspace to v2.0 filesystem-first format |
 
