@@ -177,41 +177,105 @@ class ArtifactRepository:
         except Exception:
             pass
 
-    def sync_index(self, force: bool = False) -> None:
-        """Synchronize SQLite cache index from YAML source files if changes are detected."""
-        current_state = self._get_dir_state()
-
-        if not force:
-            stored = self._get_stored_sync_state()
-            if stored == current_state:
-                return  # Database index is already fresh!
-
-        # Clear and rebuild cache index
-        with self._get_connection() as conn:
-            conn.execute("DELETE FROM artifacts")
-            conn.commit()
-
-        # Re-index all directories
-        for folder, model_cls in [
-            (self.decisions_dir, Decision),
-            (self.memory_dir, MemoryEntry),
-            (self.timeline_dir, TimelineEvent),
-        ]:
+    def _get_file_mtimes(self) -> Dict[str, float]:
+        """Generate a dict mapping absolute file path -> mtime for all YAML artifacts."""
+        mtimes: Dict[str, float] = {}
+        for folder in [self.decisions_dir, self.memory_dir, self.timeline_dir]:
             if not os.path.isdir(folder):
                 continue
-            for f in os.listdir(folder):
-                if not f.endswith(".yaml") or f.endswith(".tmp"):
-                    continue
-                file_path = os.path.join(folder, f)
-                try:
-                    with open(file_path, "r", encoding="utf-8") as file_obj:
-                        data = yaml.safe_load(file_obj)
+            for root, _, files in os.walk(folder):
+                for f in files:
+                    if f.endswith(".yaml") and not f.endswith(".tmp"):
+                        full_path = os.path.join(root, f)
+                        try:
+                            mtimes[full_path] = os.path.getmtime(full_path)
+                        except Exception:
+                            pass
+        return mtimes
+
+    def _get_stored_file_mtimes(self) -> Dict[str, float]:
+        """Retrieve last recorded file mtimes dictionary from metadata."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.execute("SELECT value FROM metadata WHERE key = 'file_mtimes'")
+                row = cursor.fetchone()
+                if row:
+                    return json.loads(row["value"])
+        except Exception:
+            pass
+        return {}
+
+    def _set_stored_file_mtimes(self, mtimes: Dict[str, float]) -> None:
+        """Save file mtimes dictionary to metadata."""
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('file_mtimes', ?)",
+                    (json.dumps(mtimes),),
+                )
+                conn.commit()
+        except Exception:
+            pass
+
+    def sync_index(self, force: bool = False) -> None:
+        """Synchronize SQLite cache index from YAML source files incrementally."""
+        current_mtimes = self._get_file_mtimes()
+
+        if force:
+            # Full rebuild requested
+            with self._get_connection() as conn:
+                conn.execute("DELETE FROM artifacts")
+                conn.commit()
+            stored_mtimes: Dict[str, float] = {}
+        else:
+            stored_mtimes = self._get_stored_file_mtimes()
+            if stored_mtimes == current_mtimes:
+                return  # Database index is already fresh!
+
+        # Compute diff
+        added_or_modified = [
+            f for f, mtime in current_mtimes.items()
+            if f not in stored_mtimes or mtime > stored_mtimes.get(f, 0.0)
+        ]
+        deleted_files = [
+            f for f in stored_mtimes if f not in current_mtimes
+        ]
+
+        if not added_or_modified and not deleted_files and not force:
+            return
+
+        # Process removals
+        if deleted_files:
+            with self._get_connection() as conn:
+                for f in deleted_files:
+                    stem = os.path.splitext(os.path.basename(f))[0]
+                    conn.execute("DELETE FROM artifacts WHERE id = ?", (stem,))
+                conn.commit()
+
+        # Process additions/modifications incrementally
+        for f in added_or_modified:
+            if not os.path.exists(f):
+                continue
+            folder_name = os.path.basename(os.path.dirname(f))
+            if folder_name == "decisions":
+                model_cls = Decision
+            elif folder_name == "timeline":
+                model_cls = TimelineEvent
+            else:
+                model_cls = MemoryEntry
+
+            try:
+                with open(f, "r", encoding="utf-8") as file_obj:
+                    data = yaml.safe_load(file_obj)
+                if data:
                     artifact = model_cls.model_validate(data)
                     self._save_to_index(artifact)
-                except Exception as e:
-                    logger.warning(f"Error indexing file {file_path}: {e}")
+            except Exception as e:
+                logger.warning(f"Error indexing file {f}: {e}")
 
-        self._set_stored_sync_state(current_state)
+        current_dir_state = self._get_dir_state()
+        self._set_stored_sync_state(current_dir_state)
+        self._set_stored_file_mtimes(current_mtimes)
 
     def _save_to_index(self, artifact: Artifact) -> None:
         """Save an artifact record directly to SQLite index (no file IO)."""
