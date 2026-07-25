@@ -38,6 +38,10 @@ jobs:
           # Use || true to prevent the step from failing immediately so we can parse findings and comment
           origin doctor --format json > findings.json || echo "doctor_failed=true" >> $GITHUB_ENV
 
+      - name: Run Test Suite with Coverage Floor Gate
+        run: |
+          pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
+
       - name: Process Doctor Findings
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

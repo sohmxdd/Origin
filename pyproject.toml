@@ -43,3 +43,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "origin" = ["py.typed", "templates/*.html"]
 
+[tool.pytest.ini_options]
+addopts = "--cov=src/origin --cov-report=term-missing --cov-fail-under=70"
+
+
