@@ -1108,25 +1108,9 @@ class OriginTUI(App):
         )
 
     def _compute_health(self) -> tuple[str, str]:
-        origin_dir = os.path.join(self.workspace_root, ".origin")
-        errors = 0
-        warnings = 0
-
-        if not os.path.exists(os.path.join(origin_dir, "config.yaml")):
-            errors += 1
-        else:
-            try:
-                config = load_config(self.workspace_root)
-                if config.schema_version != "2.0":
-                    errors += 1
-            except Exception:
-                errors += 1
-
-        if not os.path.exists(os.path.join(origin_dir, "workspace.db")):
-            errors += 1
-
-        if not os.path.isdir(os.path.join(self.workspace_root, ".git")):
-            warnings += 1
+        res = use_cases.run_doctor_checks(self.workspace_root)
+        errors = len(res["errors"])
+        warnings = len(res["warnings"])
 
         if errors > 0:
             return "●", "#e25555"

@@ -7,7 +7,7 @@ and Markdown mirror file refreshes.
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -772,4 +772,79 @@ def get_decisions_affecting_file(workspace_root: str, file_path: str) -> List[De
                 break
                 
     return matching_decisions
+
+
+def run_doctor_checks(workspace_root: str) -> Dict[str, Any]:
+    """Run workspace health checks (config schema, database integrity, file staleness, conflicts, git repo status).
+    
+    Returns:
+        A dictionary containing:
+            - errors: List[dict]
+            - warnings: List[dict]
+            - status_ok: bool
+    """
+    origin_dir = get_origin_dir(workspace_root)
+    config_path = os.path.join(origin_dir, "config.yaml")
+    db_path = os.path.join(origin_dir, "workspace.db")
+    git_dir = os.path.join(workspace_root, ".git")
+
+    errors: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+
+    if not os.path.isdir(origin_dir):
+        errors.append({
+            "message": "Not inside an Origin workspace (no .origin folder found).",
+            "ids": []
+        })
+        return {"errors": errors, "warnings": warnings, "status_ok": False}
+
+    # 1. Config validation
+    if not os.path.exists(config_path):
+        errors.append({"message": "config.yaml is missing.", "ids": []})
+    else:
+        try:
+            config = load_config(workspace_root)
+            if config.schema_version != "2.0":
+                errors.append({
+                    "message": f"schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
+                    "ids": []
+                })
+        except Exception as e:
+            errors.append({"message": f"config.yaml failed validation: {e}", "ids": []})
+
+    # 2. Database & Artifact validation
+    if not os.path.exists(db_path):
+        errors.append({"message": "SQLite workspace.db file is missing.", "ids": []})
+    else:
+        try:
+            repo = ArtifactRepository(db_path)
+            decisions = repo.list_decisions()
+            for dec in decisions:
+                for f in dec.affected_files:
+                    full_path = os.path.join(workspace_root, f)
+                    if not os.path.exists(full_path):
+                        warnings.append({
+                            "message": f"Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
+                            "ids": [dec.id]
+                        })
+
+            conflicts = check_conflicting_decisions(decisions)
+            for id1, id2, f in conflicts:
+                warnings.append({
+                    "message": f"Decisions {id1} and {id2} both affect {f} — review for conflicts.",
+                    "ids": [id1, id2]
+                })
+        except Exception as e:
+            errors.append({"message": f"SQLite database integrity check failed: {e}", "ids": []})
+
+    # 3. Git repository check
+    if not os.path.isdir(git_dir):
+        warnings.append({"message": "Workspace root is not a git repository.", "ids": []})
+
+    return {
+        "errors": errors,
+        "warnings": warnings,
+        "status_ok": len(errors) == 0,
+    }
+
 

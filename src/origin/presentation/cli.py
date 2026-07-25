@@ -545,75 +545,12 @@ def doctor(
                 typer.secho(f"Error executing fix: {e}", fg=typer.colors.RED)
             raise typer.Exit(code=1)
 
-    errors = []
-    warnings = []
-
-    # 1. Check config.yaml
+    doctor_res = use_cases.run_doctor_checks(root)
+    errors = doctor_res["errors"]
+    warnings = doctor_res["warnings"]
     config_path = os.path.join(origin_dir, "config.yaml")
-    if not os.path.exists(config_path):
-        errors.append({
-            "message": "config.yaml is missing.",
-            "ids": []
-        })
-    else:
-        try:
-            config = use_cases.load_config(root)
-            if config.schema_version != "2.0":
-                errors.append({
-                    "message": f"schema_version mismatch: expected '2.0', found '{config.schema_version}'. Run 'origin migrate' to upgrade.",
-                    "ids": []
-                })
-        except Exception as e:
-            errors.append({
-                "message": f"config.yaml failed validation: {e}",
-                "ids": []
-            })
-
-    # 2. Check SQLite db
     db_path = os.path.join(origin_dir, "workspace.db")
-    if not os.path.exists(db_path):
-        errors.append({
-            "message": "SQLite workspace.db file is missing.",
-            "ids": []
-        })
-    else:
-        try:
-            from origin.infrastructure.database import ArtifactRepository
-            repo = ArtifactRepository(db_path)
-            repo.list_decisions()
-
-            # Check affected files staleness
-            decisions = repo.list_decisions(status="active")
-            for dec in decisions:
-                for f in dec.affected_files:
-                    full_f_path = os.path.join(root, f)
-                    if not os.path.exists(full_f_path):
-                        warnings.append({
-                            "message": f"Stale file reference: Decision '{dec.id}' affects file '{f}' which does not exist.",
-                            "ids": [dec.id, f]
-                        })
-
-            # Check for conflicting active decisions (file overlap heuristic)
-            from origin.application.use_cases import check_conflicting_decisions
-            conflicts = check_conflicting_decisions(decisions)
-            for id1, id2, f in conflicts:
-                warnings.append({
-                    "message": f"Decisions {id1} and {id2} both affect {f} — review for conflicts.",
-                    "ids": [id1, id2, f]
-                })
-        except Exception as e:
-            errors.append({
-                "message": f"SQLite database integrity check failed: {e}",
-                "ids": []
-            })
-
-    # 3. Check Git Status
     git_dir = os.path.join(root, ".git")
-    if not os.path.isdir(git_dir):
-        warnings.append({
-            "message": "Workspace root is not a git repository.",
-            "ids": []
-        })
 
     # Print results based on format
     if ci:
