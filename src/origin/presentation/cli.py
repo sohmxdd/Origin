@@ -466,17 +466,9 @@ def blame(
         repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
 
         for i, dec in enumerate(decisions):
-            # Status colors & string format
-            if dec.status == "active":
-                status_str = "[bold green]ACTIVE[/]"
-            elif dec.status == "proposed":
-                status_str = "[bold yellow]PROPOSED - Pending Review[/]"
-            elif dec.status == "superseded":
-                status_str = "[bold red]SUPERSEDED[/]"
-            elif dec.status == "rejected":
-                status_str = "[bold red]REJECTED[/]"
-            else:
-                status_str = f"[bold white]{dec.status.upper()}[/]"
+            from origin.presentation.theme import get_status_info
+            st_info = get_status_info(dec.status)
+            status_str = f"[{st_info['rich_style']}]{st_info['glyph']} {st_info['label']}[/]"
 
             chain_info = ""
             if dec.status == "superseded" and dec.superseded_by:

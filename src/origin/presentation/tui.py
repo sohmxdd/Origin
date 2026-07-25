@@ -35,12 +35,18 @@ from origin.infrastructure.git import GitHelper
 from origin.adapters.flat_file import export_flat_file
 
 
+from origin.presentation.theme import (
+    GLYPH_ACTIVE,
+    GLYPH_PROPOSED,
+    GLYPH_REJECTED,
+    GLYPH_SUPERSEDED,
+    STATUS_THEME_MAP,
+)
+
+
 # ── Status and Timeline Glyph Config ───────────────────────
 STATUS_GLYPHS = {
-    "active": "●",
-    "proposed": "◌",
-    "rejected": "✕",
-    "superseded": "↺",
+    k: v["glyph"] for k, v in STATUS_THEME_MAP.items()
 }
 
 STATUS_STYLES = {
