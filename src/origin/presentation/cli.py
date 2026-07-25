@@ -420,6 +420,28 @@ def version() -> None:
     typer.echo(f"Origin CLI version: {pkg_version} | Workspace Schema version: {schema_version}")
 
 
+@app.command("badge")
+def badge(
+    url: Optional[str] = typer.Option(
+        None, "--url", "-u", help="Base URL of the deployed static site (e.g. https://user.github.io/repo)."
+    ),
+    format: str = typer.Option(
+        "markdown", "--format", "-f", help="Output format: 'markdown' or 'html'."
+    ),
+) -> None:
+    """Print the Shields.io badge snippet for your repository README."""
+    target_url = url.rstrip("/") if url else "https://username.github.io/repo"
+    badge_endpoint = f"{target_url}/badge.json"
+    shields_img_url = f"https://img.shields.io/endpoint?url={badge_endpoint}"
+
+    if format == "html":
+        snippet = f'<a href="{target_url}"><img src="{shields_img_url}" alt="Origin Architecture Health" /></a>'
+    else:
+        snippet = f"[![Origin Architecture Health]({shields_img_url})]({target_url})"
+
+    typer.echo(snippet)
+
+
 @app.command("blame")
 def blame(
     file_path: str = typer.Argument(..., help="Path of the file to blame.")

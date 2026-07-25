@@ -268,3 +268,15 @@ def test_cli_version(cli_runner: CliRunner) -> None:
     assert "Workspace Schema version:" in result.stdout
 
 
+def test_cli_badge(cli_runner: CliRunner) -> None:
+    """Verify badge command outputs Markdown and HTML README badge snippets."""
+    res_md = cli_runner.invoke(app, ["badge", "--url", "https://mysite.org"])
+    assert res_md.exit_code == 0
+    assert "[![Origin Architecture Health](https://img.shields.io/endpoint?url=https://mysite.org/badge.json)](https://mysite.org)" in res_md.stdout
+
+    res_html = cli_runner.invoke(app, ["badge", "--url", "https://mysite.org", "--format", "html"])
+    assert res_html.exit_code == 0
+    assert '<a href="https://mysite.org"><img src="https://img.shields.io/endpoint?url=https://mysite.org/badge.json" alt="Origin Architecture Health" /></a>' in res_html.stdout
+
+
+
