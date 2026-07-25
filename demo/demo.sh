@@ -4,4 +4,4 @@
 set -e
 
 echo "Running Origin v1 Prototype Demo..."
-python demo.py
+python demo/demo.py

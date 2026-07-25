@@ -60,7 +60,7 @@ Origin is structured using clean architectural patterns (Domain, Application, In
 │       ├── infrastructure/   # Filesystem storage, SQLite caching, Git, and Mirror logic
 │       └── presentation/     # Interfaces: cli.py, mcp_server.py, and tui.py
 ├── tests/                    # Comprehensive unit, integration, and Textual Pilot tests
-├── demo_tui.py               # Seeded terminal dashboard launcher
+├── demo/                     # Demo scripts and terminal dashboard launcher
 ├── pyproject.toml            # Dependencies and script definitions
 └── README.md                 # Main documentation page
 ```
