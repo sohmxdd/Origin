@@ -47,11 +47,12 @@ jobs:
           origin doctor --format json > findings.json || echo "doctor_failed=true" >> $GITHUB_ENV
 
       - name: Run Test Suite with Coverage Floor Gate
+        shell: bash
         env:
           TERM: xterm-256color
           COLORTERM: truecolor
         run: |
-          pytest --snapshot-warn-only --cov=src/origin --cov-report=term-missing --cov-fail-under=70
+          PYTHONPATH=src pytest --snapshot-warn-only --cov=src/origin --cov-report=term-missing --cov-fail-under=70
 
       - name: Process Doctor Findings
         env:
