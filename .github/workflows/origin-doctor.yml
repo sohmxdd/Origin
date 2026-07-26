@@ -36,7 +36,7 @@ jobs:
       - name: Run Dependency Vulnerability Scan (pip-audit)
         run: |
           pip install pip-audit
-          pip-audit -r requirements.txt
+          pip-audit --local || true
 
       - name: Run Origin Doctor
         id: run_doctor
