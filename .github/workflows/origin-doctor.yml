@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Test Suite with Coverage Floor Gate
         run: |
-          PYTHONPATH=src pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
+          pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
 
       - name: Process Doctor Findings
         env:
