@@ -30,9 +30,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install Origin
+      - name: Install Origin & Test Dependencies
         run: |
-          pip install -e .
+          pip install -e ".[dev]" pytest-cov
 
       - name: Run Dependency Vulnerability Scan (pip-audit)
         run: |
