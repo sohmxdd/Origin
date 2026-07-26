@@ -1,0 +1,8 @@
+# Global default code owners
+* @sohmxdd
+
+# Core python source submodules
+/src/origin/ @sohmxdd
+
+# GitHub Workflows & Actions
+/.github/ @sohmxdd

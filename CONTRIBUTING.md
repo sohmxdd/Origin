@@ -39,10 +39,11 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies in Editable Mode
+### 3. Install Dependencies & Pre-commit Hooks
 Install the package along with development and test dependencies:
 ```bash
 pip install -e ".[dev]"
+pre-commit install
 ```
 
 ---
@@ -55,26 +56,26 @@ Origin is structured using clean architectural patterns (Domain, Application, In
 ├── .origin/                  # Auto-generated workspace configuration & cached indexes
 ├── src/
 │   └── origin/
-│       ├── application/      # Use cases (business logic orchestration)
-│       ├── domain/           # Models, ULIDs, and base schemas
-│       ├── infrastructure/   # Filesystem storage, SQLite caching, Git, and Mirror logic
-│       └── presentation/     # Interfaces: cli.py, mcp_server.py, and tui.py
-├── tests/                    # Comprehensive unit, integration, and Textual Pilot tests
+│       ├── application/      # Use cases (business logic orchestration & build-site)
+│       ├── domain/           # Models, ULIDs, secrets scanner, and base schemas
+│       ├── infrastructure/   # Filesystem storage, SQLite incremental caching, Git, and Mirror logic
+│       └── presentation/     # Interfaces: cli.py, mcp_server.py, theme.py, and tui.py
+├── tests/                    # Unit, integration, Hypothesis property, stress, and TUI snapshot tests
 ├── demo/                     # Demo scripts and terminal dashboard launcher
-├── pyproject.toml            # Dependencies and script definitions
+├── pyproject.toml            # Dependencies, pytest options, and script definitions
 └── README.md                 # Main documentation page
 ```
 
 ---
 
-## 🧪 Running Tests
+## 🧪 Running Tests & Quality Checks
 
-Origin uses `pytest` for testing. 
+Origin uses `pytest`, `mypy`, and `pre-commit` for quality enforcement. A **70% test coverage floor** is enforced in CI.
 
 > [!IMPORTANT]
 > **Windows/Restricted Sandbox Environments:** Always use the `--basetemp=tmp` flag when running tests to ensure pytest creates temporary workspace folders within the local directory rather than restricted system `AppData` folders.
 
-### Run All Tests
+### Run All Tests with Coverage
 ```bash
 # Windows PowerShell
 $env:PYTHONPATH="src"
@@ -84,8 +85,17 @@ python -m pytest --basetemp=tmp -v
 PYTHONPATH=src python -m pytest --basetemp=tmp -v
 ```
 
-### Run specific test files
+### Static Type Checking (mypy)
+```bash
+python -m mypy -p origin --explicit-package-bases
+```
+
+### Run Specific Test Suites
 * **CLI Tests:** `python -m pytest tests/test_cli.py --basetemp=tmp`
+* **Blame & Path Normalization Tests:** `python -m pytest tests/test_blame.py --basetemp=tmp`
+* **Property Serialization Tests:** `python -m pytest tests/test_property_serialization.py --basetemp=tmp`
+* **1,000-Decision Stress Tests:** `python -m pytest tests/test_stress.py --no-cov --basetemp=tmp`
+* **Git Diff Tests:** `python -m pytest tests/test_diff.py --basetemp=tmp`
 * **TUI Dashboard Tests:** `python -m pytest tests/test_tui.py --basetemp=tmp`
 * **MCP Server Tests:** `python -m pytest tests/test_mcp_server.py --basetemp=tmp`
 

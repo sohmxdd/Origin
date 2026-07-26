@@ -77,3 +77,35 @@ def test_blame_path_normalization_and_history(tmp_path):
     # Check non-matching file
     history_none = get_decisions_affecting_file(workspace_root, "src/other.py")
     assert len(history_none) == 0
+
+
+def test_blame_linux_forward_slash_and_nested_paths(tmp_path):
+    """Verify that blame lookups normalize Linux forward slashes and deeply nested paths consistently."""
+    workspace_root = str(tmp_path)
+    init_workspace(workspace_root, "LinuxPathTest", with_hooks=False)
+
+    dec = add_decision(
+        workspace_root=workspace_root,
+        title="Linux Nested Component",
+        rationale="Testing POSIX path normalization across platforms",
+        alternatives_considered=[],
+        affected_files=["src/components/core/engine.py"],
+        confidence=0.95,
+        originating_agent="human",
+    )
+
+    # Linux standard POSIX forward slash
+    res_posix = get_decisions_affecting_file(workspace_root, "src/components/core/engine.py")
+    assert len(res_posix) == 1
+    assert res_posix[0].id == dec.id
+
+    # Mixed separators (Linux forward slash + Windows backslash)
+    res_mixed = get_decisions_affecting_file(workspace_root, "src/components\\core/engine.py")
+    assert len(res_mixed) == 1
+    assert res_mixed[0].id == dec.id
+
+    # Relative dot POSIX path
+    res_dot_posix = get_decisions_affecting_file(workspace_root, "./src/components/core/engine.py")
+    assert len(res_dot_posix) == 1
+    assert res_dot_posix[0].id == dec.id
+

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 from origin.config import get_origin_dir, load_config, save_config, WorkspaceConfig
 from origin.domain.models import Artifact, Decision, MemoryEntry, TimelineEvent
 from origin.exceptions import (
+    OriginError,
     DecisionNotActiveError,
     DecisionNotFoundError,
     InvalidArtifactError,
@@ -533,6 +534,7 @@ def migrate_workspace(workspace_root: str) -> None:
         data = dict(row)
         art_type = data["type"]
 
+        artifact: Artifact
         if art_type == "decision":
             alts = data.get("alternatives_considered")
             affs = data.get("affected_files")
@@ -845,6 +847,111 @@ def run_doctor_checks(workspace_root: str) -> Dict[str, Any]:
         "errors": errors,
         "warnings": warnings,
         "status_ok": len(errors) == 0,
+    }
+
+
+def get_config_value(workspace_root: str, key: str) -> Any:
+    """Get a specific workspace configuration value by key."""
+    config = load_config(workspace_root)
+    if not hasattr(config, key):
+        raise OriginError(f"Unknown configuration key '{key}'. Available keys: {list(config.model_dump().keys())}")
+    return getattr(config, key)
+
+
+def set_config_value(workspace_root: str, key: str, value_raw: str) -> Any:
+    """Set a specific workspace configuration value by key, type-casting as appropriate."""
+    config = load_config(workspace_root)
+    if not hasattr(config, key):
+        raise OriginError(f"Unknown configuration key '{key}'. Available keys: {list(config.model_dump().keys())}")
+
+    curr_val = getattr(config, key)
+    typed_val: Any = value_raw
+    if isinstance(curr_val, int):
+        try:
+            typed_val = int(value_raw)
+        except ValueError:
+            raise OriginError(f"Configuration key '{key}' expects an integer value.")
+    elif isinstance(curr_val, list):
+        typed_val = [item.strip() for item in value_raw.split(",") if item.strip()]
+
+    config_dict = config.model_dump()
+    config_dict[key] = typed_val
+    updated_config = WorkspaceConfig.model_validate(config_dict)
+    save_config(workspace_root, updated_config)
+    return getattr(updated_config, key)
+
+
+def get_origin_diff(workspace_root: str, rev1: str, rev2: str) -> Dict[str, Any]:
+    """Inspect changes in .origin/ between two Git revisions using non-mutating git plumbing.
+
+    Executes `git diff --name-status rev1 rev2 -- .origin/` and `git show <rev>:<path>`
+    without ever calling git checkout or modifying the working directory.
+    """
+    import yaml
+    git = GitHelper(workspace_root)
+    git_dir = os.path.join(workspace_root, ".git")
+    if not os.path.isdir(git_dir):
+        raise OriginError("Workspace root is not a valid Git repository.")
+
+    out = git.run_git_command(["diff", "--name-status", rev1, rev2, "--", ".origin/"])
+    if out is None:
+        raise OriginError(f"Failed to compare Git revisions '{rev1}' and '{rev2}'. Ensure both revisions exist.")
+
+    added: List[Dict[str, Any]] = []
+    modified: List[Dict[str, Any]] = []
+    deleted: List[Dict[str, Any]] = []
+
+    if not out.strip():
+        return {"rev1": rev1, "rev2": rev2, "added": added, "modified": modified, "deleted": deleted}
+
+    for line in out.strip().splitlines():
+        parts = line.strip().split("\t")
+        if len(parts) < 2:
+            continue
+        status_code = parts[0]
+        rel_path = parts[-1]
+
+        if not rel_path.endswith(".yaml") or "decisions/" not in rel_path.replace("\\", "/"):
+            continue
+
+        filename = os.path.basename(rel_path)
+        dec_id = os.path.splitext(filename)[0]
+
+        if status_code.startswith("A"):
+            raw = git.run_git_command(["show", f"{rev2}:{rel_path}"])
+            data = yaml.safe_load(raw) if raw else {}
+            title = data.get("title", dec_id) if isinstance(data, dict) else dec_id
+            status = data.get("status", "active") if isinstance(data, dict) else "active"
+            added.append({"id": dec_id, "title": title, "status": status, "path": rel_path})
+        elif status_code.startswith("M"):
+            raw1 = git.run_git_command(["show", f"{rev1}:{rel_path}"])
+            raw2 = git.run_git_command(["show", f"{rev2}:{rel_path}"])
+            d1 = yaml.safe_load(raw1) if raw1 else {}
+            d2 = yaml.safe_load(raw2) if raw2 else {}
+            t1 = d1.get("title", dec_id) if isinstance(d1, dict) else dec_id
+            t2 = d2.get("title", dec_id) if isinstance(d2, dict) else dec_id
+            st1 = d1.get("status") if isinstance(d1, dict) else None
+            st2 = d2.get("status") if isinstance(d2, dict) else None
+            modified.append({
+                "id": dec_id,
+                "old_title": t1,
+                "new_title": t2,
+                "old_status": st1,
+                "new_status": st2,
+                "path": rel_path,
+            })
+        elif status_code.startswith("D"):
+            raw = git.run_git_command(["show", f"{rev1}:{rel_path}"])
+            data = yaml.safe_load(raw) if raw else {}
+            title = data.get("title", dec_id) if isinstance(data, dict) else dec_id
+            deleted.append({"id": dec_id, "title": title, "path": rel_path})
+
+    return {
+        "rev1": rev1,
+        "rev2": rev2,
+        "added": added,
+        "modified": modified,
+        "deleted": deleted,
     }
 
 

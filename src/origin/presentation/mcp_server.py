@@ -10,6 +10,7 @@ from typing import List
 from mcp.server.fastmcp import FastMCP
 
 from origin.application import use_cases
+from origin.domain.models import Decision
 from origin.exceptions import OriginError
 
 
@@ -316,7 +317,7 @@ def origin_blame(file_path: str) -> str:
             chain_info = ""
             if dec.status == "superseded" and dec.superseded_by:
                 sup_dec = repo.get(dec.superseded_by)
-                sup_title = f"'{sup_dec.title}'" if sup_dec else "Unknown"
+                sup_title = f"'{sup_dec.title}'" if isinstance(sup_dec, Decision) else "Unknown"
                 chain_info = f"\n  * ↳ Superseded by: `{dec.superseded_by}` ({sup_title})"
 
             lines.append(f"## [{i+1}/{len(decisions)}] Decision `{dec.id}`")

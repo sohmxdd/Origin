@@ -6,13 +6,14 @@ Provides user commands to interact with Origin's memory and decision log.
 import json
 import os
 import sys
-from typing import List, Optional
+from typing import List, Optional, Dict
 import typer
 
 from rich.console import Console
 from rich.table import Table
 
 from origin.application import use_cases
+from origin.domain.models import Decision, MemoryEntry
 from origin.exceptions import OriginError, WorkspaceNotInitializedError
 from origin.adapters.flat_file import export_flat_file
 
@@ -20,11 +21,14 @@ app = typer.Typer(
     name="origin",
     help="Origin: A local-first, git-friendly persistent memory layer for AI agents.",
 )
+console = Console()
 decision_app = typer.Typer(name="decision", help="Manage architecture decision records (ADR).")
 memory_app = typer.Typer(name="memory", help="Manage project conventions and stack memory.")
+config_app = typer.Typer(name="config", help="Read and update workspace configuration.")
 
 app.add_typer(decision_app)
 app.add_typer(memory_app)
+app.add_typer(config_app)
 
 
 def find_workspace_root() -> str:
@@ -211,7 +215,8 @@ def decision_list(
     ),
     affects: Optional[str] = typer.Option(
         None, "--affects", help="Filter decisions affecting a specific file."
-    )
+    ),
+    format: str = typer.Option("text", "--format", "-f", help="Output format ('text' or 'json')."),
 ) -> None:
     """List recorded decisions in this workspace."""
     root = find_workspace_root()
@@ -224,6 +229,11 @@ def decision_list(
         decisions = repo.list_decisions(status=status)
         if affects:
             decisions = [dec for dec in decisions if affects in dec.affected_files]
+
+        if format == "json":
+            import json
+            print(json.dumps([d.model_dump(mode="json") for d in decisions], indent=2))
+            return
 
         if not decisions:
             typer.echo(f"No decisions found with status '{status}'" + (f" affecting '{affects}'" if affects else "") + ".")
@@ -350,11 +360,19 @@ def context() -> None:
 
 
 @app.command("search")
-def search(query: str = typer.Argument(..., help="Keyword query string.")) -> None:
-    """Search across active decisions and memory entries."""
+def search(
+    query: str = typer.Argument(..., help="Search query across titles, rationales, and memory."),
+    format: str = typer.Option("text", "--format", "-f", help="Output format ('text' or 'json')."),
+) -> None:
+    """Search project decisions and memories."""
     root = find_workspace_root()
     try:
         results = use_cases.search_artifacts(root, query)
+        if format == "json":
+            import json
+            print(json.dumps([art.model_dump(mode="json") for art in results], indent=2))
+            return
+
         if not results:
             typer.echo("No matching artifacts found.")
             return
@@ -444,12 +462,18 @@ def badge(
 
 @app.command("blame")
 def blame(
-    file_path: str = typer.Argument(..., help="Path of the file to blame.")
+    file_path: str = typer.Argument(..., help="Path of the file to blame."),
+    format: str = typer.Option("text", "--format", "-f", help="Output format ('text' or 'json')."),
 ) -> None:
     """Show the chronological decision history affecting a specific file."""
     root = find_workspace_root()
     try:
         decisions = use_cases.get_decisions_affecting_file(root, file_path)
+        if format == "json":
+            import json
+            print(json.dumps([d.model_dump(mode="json") for d in decisions], indent=2))
+            return
+
         if not decisions:
             typer.secho(f"No recorded decisions affect file '{file_path}'.", fg=typer.colors.YELLOW)
             return
@@ -473,7 +497,7 @@ def blame(
             chain_info = ""
             if dec.status == "superseded" and dec.superseded_by:
                 sup_dec = repo.get(dec.superseded_by)
-                sup_title = f"'{sup_dec.title}'" if sup_dec else "Unknown"
+                sup_title = f"'{sup_dec.title}'" if isinstance(sup_dec, Decision) else "Unknown"
                 chain_info = f"\n    [bold red]↳ Superseded by:[/] {dec.superseded_by} ({sup_title})"
 
             # Render thin visual divider/whitespace layout
@@ -491,6 +515,79 @@ def blame(
         
     except Exception as e:
         typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+
+@config_app.command("get")
+def config_get(
+    key: str = typer.Argument(..., help="Configuration key (e.g. token_budget, workspace_name)")
+) -> None:
+    """Get the value of a workspace configuration key."""
+    root = find_workspace_root()
+    try:
+        val = use_cases.get_config_value(root, key)
+        console.print(f"[cyan]{key}[/]: {val}")
+    except OriginError as e:
+        console.print(f"[bold red]Configuration Error:[/] {e}")
+        raise typer.Exit(code=1)
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(..., help="Configuration key to update"),
+    value: str = typer.Argument(..., help="New value for the configuration key"),
+) -> None:
+    """Set the value of a workspace configuration key."""
+    root = find_workspace_root()
+    try:
+        new_val = use_cases.set_config_value(root, key, value)
+        console.print(f"[bold green]✓[/] Updated [cyan]{key}[/] -> [bold white]{new_val}[/]")
+    except OriginError as e:
+        console.print(f"[bold red]Configuration Error:[/] {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command("diff")
+def diff(
+    rev1: str = typer.Argument(..., help="First Git revision (e.g. HEAD~1, main, sha)"),
+    rev2: str = typer.Argument("HEAD", help="Second Git revision (defaults to HEAD)"),
+    format: str = typer.Option("text", "--format", help="Output format ('text' or 'json')."),
+) -> None:
+    """Pretty-print human-readable summary of .origin/ decision changes between two Git revisions."""
+    root = find_workspace_root()
+    try:
+        res = use_cases.get_origin_diff(root, rev1, rev2)
+        if format == "json":
+            import json
+            print(json.dumps(res, indent=2))
+            return
+
+        console.print(f"[bold cyan]Origin Diff:[/] Comparing [bold yellow]{rev1}[/] ➔ [bold yellow]{rev2}[/]\n")
+        added = res["added"]
+        modified = res["modified"]
+        deleted = res["deleted"]
+
+        if not added and not modified and not deleted:
+            console.print("[dim]No decision changes detected between revisions.[/]")
+            return
+
+        if added:
+            console.print(f"[bold green]Added ({len(added)}):[/]")
+            for item in added:
+                console.print(f"  [green]+[/] [bold]{item['id']}[/]: {item['title']} ([dim]{item['status']}[/])")
+
+        if modified:
+            console.print(f"\n[bold yellow]Modified ({len(modified)}):[/]")
+            for item in modified:
+                st_change = f" ({item['old_status']} ➔ {item['new_status']})" if item['old_status'] != item['new_status'] else ""
+                console.print(f"  [yellow]~[/] [bold]{item['id']}[/]: {item['new_title']}{st_change}")
+
+        if deleted:
+            console.print(f"\n[bold red]Deleted ({len(deleted)}):[/]")
+            for item in deleted:
+                console.print(f"  [red]-[/] [bold]{item['id']}[/]: {item['title']}")
+    except OriginError as e:
+        console.print(f"[bold red]Diff Error:[/] {e}")
         raise typer.Exit(code=1)
 
 
@@ -783,10 +880,10 @@ def build_site(
         config = use_cases.load_config(root)
         from origin.infrastructure.database import ArtifactRepository
         repo = ArtifactRepository(os.path.join(origin_dir, "workspace.db"))
-        repo.sync_index()
-
-        # Load all records
-        all_decisions = repo.list_decisions()
+        
+        with console.status("[bold cyan]Compiling workspace site & badges...", spinner="dots"):
+            repo.sync_index()
+            all_decisions = repo.list_decisions()
         all_memories = repo.list_memory()
         all_timeline = repo.list_timeline()
 
@@ -869,7 +966,7 @@ def build_site(
             superseding_title = None
             if d.status == "superseded" and d.superseded_by:
                 sup_dec = repo.get(d.superseded_by)
-                if sup_dec:
+                if isinstance(sup_dec, Decision):
                     superseding_title = sup_dec.title
 
             superseded_decisions = [

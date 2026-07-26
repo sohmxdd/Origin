@@ -153,3 +153,22 @@ origin export --target claude-code || true
             return commits
         except Exception:
             return []
+
+    def run_git_command(self, args: list[str]) -> Optional[str]:
+        """Execute a git command in the workspace directory without shell string interpolation."""
+        git_dir = os.path.join(self.workspace_path, ".git")
+        if not os.path.isdir(git_dir):
+            return None
+
+        try:
+            result = subprocess.run(
+                ["git"] + args,
+                cwd=self.workspace_path,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10.0,
+            )
+            return result.stdout
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+            return None

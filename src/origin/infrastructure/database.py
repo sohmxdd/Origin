@@ -257,6 +257,7 @@ class ArtifactRepository:
             if not os.path.exists(f):
                 continue
             folder_name = os.path.basename(os.path.dirname(f))
+            model_cls: type[Artifact]
             if folder_name == "decisions":
                 model_cls = Decision
             elif folder_name == "timeline":

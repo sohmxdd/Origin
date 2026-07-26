@@ -33,3 +33,9 @@ class InvalidArtifactError(OriginError):
 class SecretDetectedError(OriginError):
     """Raised when a potential credential or secret pattern is detected."""
     pass
+
+
+class InvalidConfigError(OriginError):
+    """Raised when workspace config.yaml is missing, malformed, or fails validation."""
+    pass
+

@@ -8,7 +8,7 @@ import yaml
 from typing import List
 from pydantic import BaseModel, Field
 
-from origin.exceptions import WorkspaceNotInitializedError
+from origin.exceptions import WorkspaceNotInitializedError, InvalidConfigError
 
 
 class WorkspaceConfig(BaseModel):
@@ -39,6 +39,7 @@ def load_config(workspace_root: str) -> WorkspaceConfig:
 
     Raises:
         WorkspaceNotInitializedError: If the .origin folder or config.yaml doesn't exist.
+        InvalidConfigError: If config.yaml is malformed or invalid.
     """
     origin_dir = get_origin_dir(workspace_root)
     config_path = os.path.join(origin_dir, "config.yaml")
@@ -51,9 +52,13 @@ def load_config(workspace_root: str) -> WorkspaceConfig:
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
+        if not isinstance(data, dict):
+            raise InvalidConfigError("config.yaml content must be a YAML dictionary")
         return WorkspaceConfig.model_validate(data)
+    except WorkspaceNotInitializedError:
+        raise
     except Exception as e:
-        raise WorkspaceNotInitializedError(f"Failed to load workspace config.yaml: {e}")
+        raise InvalidConfigError(f"Invalid workspace configuration in '.origin/config.yaml': {e}")
 
 
 def save_config(workspace_root: str, config: WorkspaceConfig) -> None:

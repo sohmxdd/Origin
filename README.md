@@ -19,9 +19,10 @@ Origin stores each artifact as an individual YAML file (git-mergeable, human-rea
 ```mermaid
 graph TD
     subgraph Client ["Developer Environments & Agents"]
-        CLI["origin CLI"]
+        CLI["origin CLI (blame, config, diff, build-site)"]
         TUI["origin (Interactive Dashboard)"]
         Agent["Any AI Agent (via MCP or file read)"]
+        Bot["PR Context Bot (GitHub Actions)"]
     end
 
     subgraph OriginCore ["Origin Core Layer"]
@@ -29,6 +30,8 @@ graph TD
         YAML["YAML Files (Source of Truth)"]
         DB[(SQLite Index Cache)]
         Mirror["Mirror Writer"]
+        SiteBuilder["Static Site & Badge Generator"]
+        BlameEngine["File Blame History Engine"]
     end
 
     subgraph Git ["Git / Synchronization"]
@@ -39,12 +42,17 @@ graph TD
         Generic["ORIGIN.md (Universal)"]
         CLAUDE["CLAUDE.md (Claude Code)"]
         Cursor[".cursorrules (Cursor)"]
+        HTML["site/ (Static HTML ADR Portal)"]
     end
 
     CLI --> App
     TUI --> App
+    Bot --> App
     Agent <-->|MCP Protocol StdIO| App
     App <--> YAML
+    App --> BlameEngine
+    App --> SiteBuilder
+    SiteBuilder --> HTML
     YAML --> DB
     App --> Mirror
     Mirror --> Generic
