@@ -45,6 +45,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = "--cov=origin --cov-report=term-missing --cov-fail-under=70"
+addopts = "--cov=src/origin --cov-report=term-missing --cov-fail-under=70"
+
+[tool.coverage.run]
+source = ["src/origin"]
 
 
