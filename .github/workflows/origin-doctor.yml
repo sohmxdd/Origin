@@ -52,7 +52,7 @@ jobs:
           TERM: xterm-256color
           COLORTERM: truecolor
         run: |
-          PYTHONPATH=src pytest --snapshot-warn-only --cov=src/origin --cov-report=term-missing --cov-fail-under=70
+          PYTHONPATH=src pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
 
       - name: Process Doctor Findings
         env:
