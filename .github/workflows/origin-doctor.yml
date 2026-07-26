@@ -36,7 +36,7 @@ jobs:
       - name: Run Dependency Vulnerability Scan (pip-audit)
         run: |
           pip install pip-audit
-          pip-audit --local || true
+          pip-audit
 
       - name: Run Origin Doctor
         id: run_doctor
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Test Suite with Coverage Floor Gate
         run: |
-          pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
+          PYTHONPATH=src pytest --cov=src/origin --cov-report=term-missing --cov-fail-under=70
 
       - name: Process Doctor Findings
         env:
